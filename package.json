@@ -1,0 +1,16 @@
+{
+  "name": "nexus-talk",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @nexus-talk/web",
+    "build": "npm run build --workspace @nexus-talk/web",
+    "lint": "npm run lint --workspace @nexus-talk/web",
+    "web:dev": "npm run dev --workspace @nexus-talk/web",
+    "web:lint": "npm run lint --workspace @nexus-talk/web"
+  }
+}
