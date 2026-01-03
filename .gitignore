@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+**/node_modules/
+**/dist
+
+# build outputs
+dist/
+build/
+.turbo/
+.next/
+
+# env/config
+.env
+.env.*
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# testing/coverage
+coverage/
+.nyc_output/
+
+# misc
+/tmp/
