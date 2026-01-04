@@ -7,10 +7,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @nexus-talk/web",
-    "build": "npm run build --workspace @nexus-talk/web",
+    "web:build": "npm run build --workspace @nexus-talk/web",
     "lint": "npm run lint --workspace @nexus-talk/web",
     "web:dev": "npm run dev --workspace @nexus-talk/web",
-    "web:lint": "npm run lint --workspace @nexus-talk/web"
+    "web:lint": "npm run lint --workspace @nexus-talk/web",
+    "api:dev": "npm run start:dev --workspace @nexus-talk/api"
   }
 }
