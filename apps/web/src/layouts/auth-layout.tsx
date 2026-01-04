@@ -57,13 +57,8 @@ export function AuthLayout() {
         </div>
       </section>
 
-      <section className="flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md rounded-3xl border bg-card/95 p-8 shadow-2xl">
-          <header className="mb-6 text-center">
-            <p className="text-xs uppercase tracking-[0.4em] text-primary">
-              Welcome back
-            </p>
-          </header>
+      <section className="flex flex-1 justify-center items-center overflow-y-auto px-6 py-10">
+        <div className="w-full max-w-md space-y-8">
           <Outlet />
         </div>
       </section>

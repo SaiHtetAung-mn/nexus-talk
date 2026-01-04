@@ -10,8 +10,8 @@ build/
 .next/
 
 # env/config
-.env
-.env.*
+**/.env
+**/.env.*
 
 # logs
 npm-debug.log*

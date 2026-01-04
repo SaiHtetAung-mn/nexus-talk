@@ -6,7 +6,7 @@ export function RegisterPage() {
     <div className="space-y-6">
       <div className="space-y-1 text-center">
         <h1 className="text-2xl font-semibold text-foreground">
-          Create your space
+          Sign Up
         </h1>
       </div>
       <RegisterForm />
