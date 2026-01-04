@@ -1,7 +1,8 @@
 import { App } from '@/core/app';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await App.create();
+  const app = await App.create(AppModule);
   await app.start(process.env.PORT ?? 3000);
 }
 void bootstrap();

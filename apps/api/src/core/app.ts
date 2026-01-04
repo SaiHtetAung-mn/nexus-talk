@@ -1,13 +1,12 @@
-import type { INestApplication } from '@nestjs/common';
+import type { INestApplication, Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import helmet from 'helmet';
 
 export class App {
   private constructor(private readonly app: INestApplication) {}
 
-  static async create(): Promise<App> {
-    const nestApp = await NestFactory.create(AppModule);
+  static async create<T extends Type>(appModule: T): Promise<App> {
+    const nestApp = await NestFactory.create(appModule);
     const app = new App(nestApp);
     app.config();
 
