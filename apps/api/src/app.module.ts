@@ -1,10 +1,12 @@
 import appConfig from '@/config/app.config';
 import { envValidationSchema } from '@/config/env.validation';
+import databaseConfig from '@/config/database.config';
+import { DatabaseModule } from '@/database/database.module';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import RequestLoggerMiddleware from './middlewares/request-logger.middleware';
+import RequestLoggerMiddleware from './core/middlewares/request-logger.middleware';
 
 @Module({
   imports: [
@@ -12,8 +14,9 @@ import RequestLoggerMiddleware from './middlewares/request-logger.middleware';
       isGlobal: true,
       envFilePath: '.env',
       validationSchema: envValidationSchema,
-      load: [appConfig],
+      load: [appConfig, databaseConfig],
     }),
+    DatabaseModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -43,6 +46,6 @@ import RequestLoggerMiddleware from './middlewares/request-logger.middleware';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggerMiddleware).forRoutes("*");
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
   }
 }
