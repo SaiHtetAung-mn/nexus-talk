@@ -24,6 +24,18 @@ export class UserService {
     return this.userRepository.findOne({ where: { username } });
   }
 
+  async findUserByProviderAccount(
+    provider: User['provider'],
+    providerId: string,
+  ): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: {
+        provider,
+        provider_id: providerId,
+      },
+    });
+  }
+
   async findUserByEmailWithPassword(email: string): Promise<User | null> {
     const users = (await this.userRepository
       .aggregate([
@@ -50,6 +62,10 @@ export class UserService {
 
   async createUser(data: Partial<User>): Promise<User> {
     const user = this.userRepository.create(data);
+    return this.userRepository.save(user);
+  }
+
+  async saveUser(user: User): Promise<User> {
     return this.userRepository.save(user);
   }
 

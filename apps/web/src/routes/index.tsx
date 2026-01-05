@@ -12,18 +12,24 @@ import { ContactsPage } from "@/features/workspace/pages/contacts-page";
 import { LoginPage } from "@/features/auth/pages/login-page";
 import { RegisterPage } from "@/features/auth/pages/register-page";
 import { NotFoundRoute } from "@/pages/not-found";
+import { ProtectedRoute } from "@/routes/components/protected-route";
+import { GuestRoute } from "@/routes/components/guest-route";
 
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-      <Route element={<DashboardLayout />}>
-        <Route index element={<HomePage />} />
-        <Route path="calls" element={<CallsPage />} />
-        <Route path="contacts" element={<ContactsPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/calls" element={<CallsPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+        </Route>
       </Route>
-      <Route path="/auth" element={<AuthLayout />}>
-        <Route index element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
+      <Route element={<GuestRoute />}>
+        <Route path="/auth" element={<AuthLayout />}>
+          <Route index element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<NotFoundRoute />} />
     </>,

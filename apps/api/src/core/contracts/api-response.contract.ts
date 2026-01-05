@@ -8,7 +8,8 @@ export interface ApiResponse<T = any> {
   };
   error?: {
     message: string;
-    fieldErrors?: { [field: string]: string[] };
+    fieldErrors?: { [field: string]: string };
+    token_expired?: boolean;
   };
 }
 
@@ -28,7 +29,8 @@ export interface ApiErrorResponse extends ApiResponse<null> {
   message: null;
   error: {
     message: string;
-    fieldErrors?: { [field: string]: string[] };
+    fieldErrors?: { [field: string]: string };
+    token_expired?: boolean;
   };
 }
 

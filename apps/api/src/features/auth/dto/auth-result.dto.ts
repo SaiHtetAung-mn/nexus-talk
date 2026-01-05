@@ -1,8 +1,8 @@
 import { UserResponseDto } from '@/features/user/dto/user-response.dto';
 
 export type TokenPairDto = {
-  accessToken: string;
-  refreshToken: string;
+  access_token: string;
+  refresh_token: string;
 };
 
 export type AuthResultDto = {

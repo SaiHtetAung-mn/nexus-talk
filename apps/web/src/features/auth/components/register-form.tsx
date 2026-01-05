@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+
+import { isApiError } from "@/lib/api-error";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +13,20 @@ import {
   registerSchema,
   type RegisterValues,
 } from "@/features/auth/schemas/register-schema";
+import { registerUser } from "@/features/auth/api/register";
+import { useAuthStore } from "@/features/auth/store/auth-store";
 
 export function RegisterForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
   const [step, setStep] = useState<"email" | "details">("email");
+  const navigate = useNavigate();
+  const setAuthUser = useAuthStore((state) => state.setUser);
   const {
     register,
     handleSubmit,
     trigger,
     getValues,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -31,11 +39,29 @@ export function RegisterForm() {
   });
 
   async function onSubmit(values: RegisterValues) {
-    void values;
     setStatus("loading");
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setStatus("success");
-    setTimeout(() => setStatus("idle"), 1800);
+    try {
+      const data = await registerUser(values);
+      setAuthUser(data.user);
+      navigate("/", { replace: true });
+      setStatus("success");
+      setTimeout(() => setStatus("idle"), 2000);
+      toast.success("Account created! You can start chatting now.");
+    } catch (error) {
+      setStatus("idle");
+      if (isApiError(error) && error.fieldErrors) {
+        Object.entries(error.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof RegisterValues, { message });
+        });
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.";
+      setError("root", { message });
+      toast.error(message);
+    }
   }
 
   async function handleEmailContinue() {
@@ -145,6 +171,11 @@ export function RegisterForm() {
           {status === "loading" ? "Creating..." : "Join Nexus Talk"}
         </Button>
       )}
+      {errors.root && (
+        <p className="text-center text-sm text-destructive">
+          {errors.root.message}
+        </p>
+      )}
       <p className="text-center text-sm text-muted-foreground">
         Already part of the community?{" "}
         <Link to="/auth" className="font-medium text-primary">
@@ -153,7 +184,7 @@ export function RegisterForm() {
       </p>
       {status === "success" && (
         <p className="rounded-md bg-indigo-100 px-3 py-2 text-center text-sm font-medium text-indigo-900">
-          Account drafted! Connect this to your NestJS API to persist users.
+          Account created! You can start chatting now.
         </p>
       )}
     </form>
