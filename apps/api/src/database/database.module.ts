@@ -4,9 +4,7 @@ import AppDataSource from './data-source';
 
 @Global()
 @Module({
-  imports: [
-    TypeOrmModule.forRoot(AppDataSource.options)
-  ],
+  imports: [TypeOrmModule.forRoot(AppDataSource.options)],
   exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

@@ -11,6 +11,12 @@
     "lint": "npm run lint --workspace @nexus-talk/web",
     "web:dev": "npm run dev --workspace @nexus-talk/web",
     "web:lint": "npm run lint --workspace @nexus-talk/web",
-    "api:dev": "npm run start:dev --workspace @nexus-talk/api"
+    "api:dev": "npm run start:dev --workspace @nexus-talk/api",
+    "api:lint": "npm run lint --workspace @nexus-talk/api",
+    "prisma:generate": "npm run prisma:generate --workspace @nexus-talk/api"
+  },
+  "dependencies": {
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.3"
   }
 }
