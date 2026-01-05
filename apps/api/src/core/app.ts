@@ -17,6 +17,10 @@ export class App {
     this.app.use(helmet());
   }
 
+  getInstance() {
+    return this.app;
+  }
+
   async start(port: number | string) {
     const resolvedPort = typeof port === 'string' ? parseInt(port, 10) : port;
     await this.app.listen(resolvedPort || 3000);

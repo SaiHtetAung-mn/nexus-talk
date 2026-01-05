@@ -7,6 +7,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import RequestLoggerMiddleware from './core/middlewares/request-logger.middleware';
+import authConfig from './config/auth.config';
+import { AuthModule } from './features/auth/auth.module';
+import { UserModule } from './features/user/users.module';
 
 @Module({
   imports: [
@@ -14,7 +17,7 @@ import RequestLoggerMiddleware from './core/middlewares/request-logger.middlewar
       isGlobal: true,
       envFilePath: '.env',
       validationSchema: envValidationSchema,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, authConfig],
     }),
     DatabaseModule,
     ThrottlerModule.forRootAsync({
@@ -36,6 +39,8 @@ import RequestLoggerMiddleware from './core/middlewares/request-logger.middlewar
     }),
 
     /** Feature modules import */
+    UserModule,
+    AuthModule,
   ],
   providers: [
     {
