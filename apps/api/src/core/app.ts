@@ -1,6 +1,14 @@
-import type { INestApplication, Type } from '@nestjs/common';
+import {
+  ValidationPipe,
+  type INestApplication,
+  type Type,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
+import HttpExceptionFilter from './filters/http-exception.filter';
+import UnhandleExceptionFilter from './filters/unhandle-exception.filter';
+import { ConfigService } from '@nestjs/config';
+import * as cookieParser from 'cookie-parser';
 
 export class App {
   private constructor(private readonly app: INestApplication) {}
@@ -14,7 +22,20 @@ export class App {
   }
 
   private config() {
+    const config = this.app.get(ConfigService);
     this.app.use(helmet());
+    this.app.use(cookieParser());
+    this.app.enableCors({
+      origin: config.get<Array<string>>('app.allowOrigins'),
+      credentials: true,
+    });
+    this.app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
+    this.app.useGlobalFilters(
+      new UnhandleExceptionFilter(),
+      new HttpExceptionFilter(),
+    );
   }
 
   getInstance() {

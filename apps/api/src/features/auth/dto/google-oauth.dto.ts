@@ -1,6 +1,6 @@
 import { IsNotEmpty } from 'class-validator';
 
-export class RefreshTokenDto {
+export class GoogleOAuthDto {
   @IsNotEmpty()
-  refreshToken: string;
+  idToken: string;
 }

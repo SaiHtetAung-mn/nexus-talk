@@ -4,32 +4,29 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-import {
-  clearAuthTokens,
-  getAccessToken,
-  getRefreshToken,
-  setAuthTokens,
-} from "./auth-tokens";
-import type { LoginResponse } from "@/features/auth/api/login";
+import type { AuthResponse } from "@/features/auth/api/types";
+import { ApiError } from "@/lib/api-error";
+import { useAuthStore } from "@/features/auth/store/auth-store";
+
+type ApiErrorResponse = {
+  success?: boolean;
+  statusCode?: number;
+  error?: {
+    message?: string;
+    fieldErrors?: Record<string, string>;
+    token_expired?: boolean;
+  };
+};
 
 type RetriableAxiosConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export const http: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
-});
-
-http.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 let isRefreshing = false;
@@ -59,8 +56,10 @@ http.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as RetriableAxiosConfig | undefined;
     const status = error.response?.status;
+    const apiErrorData = error.response?.data as ApiErrorResponse | undefined;
+    const isTokenExpired = apiErrorData?.error?.token_expired ?? false;
 
-    if (status === 401 && config && !config._retry) {
+    if (status === 401 && isTokenExpired && config && !config._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           enqueueRequest(
@@ -81,11 +80,22 @@ http.interceptors.response.use(
         return http(config);
       } catch (refreshError) {
         flushQueue(refreshError);
-        clearAuthTokens();
+        useAuthStore.getState().clearUser();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
+    }
+
+    if (apiErrorData?.error?.message) {
+      const statusCode = apiErrorData.statusCode ?? status ?? 500;
+      return Promise.reject(
+        new ApiError(
+          apiErrorData.error.message,
+          statusCode,
+          apiErrorData.error.fieldErrors,
+        ),
+      );
     }
 
     return Promise.reject(error);
@@ -93,21 +103,11 @@ http.interceptors.response.use(
 );
 
 async function refreshAccessToken() {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    throw new Error("Session expired. Please sign in again.");
-  }
-
-  const response = await axios.post<LoginResponse>(
+  await axios.post<AuthResponse>(
     `${API_BASE_URL}/auth/refresh`,
-    { refreshToken },
+    {},
     {
       withCredentials: true,
     },
   );
-
-  setAuthTokens({
-    accessToken: response.data.accessToken,
-    refreshToken: response.data.refreshToken,
-  });
 }

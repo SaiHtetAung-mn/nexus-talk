@@ -6,24 +6,40 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService, TokenExpiredError } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 
 import { User } from '@/database/entities/User';
 import { UserService } from '@/features/user/user.service';
+import { UserResponseDto } from '@/features/user/dto/user-response.dto';
 
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { AuthResultDto, TokenPairDto } from './dto/auth-result.dto';
+import { GoogleOAuthDto } from './dto/google-oauth.dto';
+import type { CookieOptions, Response } from 'express';
+import { authCookie } from '@/common/constants/auth-cookie.constant';
 import { TokenExpiredException } from './exceptions/token-expired.exception';
-import { JwtPayload } from './types/jwt-payload.type';
+
+type JwtPayload = {
+  userId: string;
+  iat?: number;
+  exp?: number;
+};
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient: OAuth2Client | null;
+  private readonly googleAudience: string | null;
+
   constructor(
     private readonly userService: UserService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    const clientId = this.configService.get<string>('auth.googleOAuthClientId');
+    this.googleClient = clientId ? new OAuth2Client(clientId) : null;
+    this.googleAudience = clientId ?? null;
+  }
 
   async register(payload: RegisterDto): Promise<AuthResultDto> {
     const email = payload.email.toLowerCase().trim();
@@ -56,13 +72,13 @@ export class AuthService {
     const email = payload.email.toLowerCase().trim();
     const user = await this.userService.findUserByEmailWithPassword(email);
 
-    if (!user || !user.password) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!user) {
+      throw new UnauthorizedException('Email is not registered');
     }
 
     const isValidPassword = this.comparePassword(
       payload.password,
-      user.password,
+      user.password!,
     );
 
     if (!isValidPassword) {
@@ -72,8 +88,12 @@ export class AuthService {
     return this.buildAuthResult(user);
   }
 
-  async refreshTokens(body: RefreshTokenDto): Promise<AuthResultDto> {
-    const payload = this.verifyRefreshJwtToken(body.refreshToken);
+  async refreshTokens(refreshToken?: string | null): Promise<AuthResultDto> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const payload = this.verifyRefreshJwtToken(refreshToken);
     if (!payload?.userId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -84,6 +104,120 @@ export class AuthService {
     }
 
     return this.buildAuthResult(user);
+  }
+
+  attachAuthCookies(res: Response, tokens: TokenPairDto) {
+    const accessOptions = this.getCookieOptions(
+      '/',
+      this.getAccessTokenTtlMinutes(),
+    );
+    const refreshOptions = this.getCookieOptions(
+      '/auth/refresh',
+      this.getRefreshTokenTtlMinutes(),
+    );
+
+    res.cookie(
+      authCookie.ACCESS_TOKEN_COOKIE,
+      tokens.access_token,
+      accessOptions,
+    );
+    res.cookie(
+      authCookie.REFRESH_TOKEN_COOKIE,
+      tokens.refresh_token,
+      refreshOptions,
+    );
+  }
+
+  async loginWithGoogle(dto: GoogleOAuthDto): Promise<AuthResultDto> {
+    const client = this.getGoogleClient();
+    const ticket = await client.verifyIdToken({
+      idToken: dto.idToken,
+      audience: this.googleAudience ?? undefined,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new UnauthorizedException('Invalid Google credential');
+    }
+
+    const email = payload.email?.toLowerCase();
+    const providerId = payload.sub;
+    if (!email || !providerId) {
+      throw new UnauthorizedException('Invalid Google credential');
+    }
+
+    let user = await this.userService.findUserByProviderAccount(
+      'google',
+      providerId,
+    );
+
+    if (!user) {
+      const existingEmailUser = await this.userService.findUserByEmail(email);
+
+      if (existingEmailUser) {
+        existingEmailUser.provider = 'google';
+        existingEmailUser.provider_id = providerId;
+        existingEmailUser.is_email_verified =
+          payload.email_verified ?? existingEmailUser.is_email_verified;
+        if (!existingEmailUser.name && payload.name) {
+          existingEmailUser.name = payload.name;
+        }
+
+        user = await this.userService.saveUser(existingEmailUser);
+      }
+    }
+
+    if (!user) {
+      const usernameSeed =
+        payload.given_name ??
+        payload.family_name ??
+        email.split('@')[0] ??
+        'user';
+      const username = await this.generateUniqueUsername(usernameSeed);
+
+      user = await this.userService.createUser({
+        name: payload.name ?? usernameSeed,
+        email,
+        username,
+        provider: 'google',
+        provider_id: providerId,
+        is_email_verified: payload.email_verified ?? true,
+        password: null,
+      });
+    }
+
+    return this.buildAuthResult(user);
+  }
+
+  async getCurrentUser(accessToken?: string | null): Promise<UserResponseDto> {
+    if (!accessToken) {
+      throw new UnauthorizedException({
+        message: 'Access token is missing',
+      });
+    }
+
+    const payload = this.verifyAccessJwtToken(accessToken);
+    if (!payload?.userId) {
+      throw new UnauthorizedException({
+        message: 'Invalid access token',
+      });
+    }
+
+    const user = await this.userService.findUserById(payload.userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        message: 'User no longer exists',
+      });
+    }
+
+    const safeUser = this.userService.toResponse(user);
+    if (!safeUser) {
+      throw new UnauthorizedException({
+        message: 'Unable to load user profile',
+      });
+    }
+
+    return safeUser;
   }
 
   verifyAccessJwtToken(token: string): JwtPayload {
@@ -98,7 +232,9 @@ export class AuthService {
       ) {
         throw new TokenExpiredException('Access token has expired');
       }
-      throw new UnauthorizedException('Invalid access token');
+      throw new UnauthorizedException({
+        message: 'Invalid access token',
+      });
     }
   }
 
@@ -112,9 +248,11 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException('Refresh token has expired');
+          throw new TokenExpiredException('Refresh token has expired');
       }
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException({
+        message: 'Invalid refresh token',
+      });
     }
   }
 
@@ -130,8 +268,8 @@ export class AuthService {
 
   private buildTokenPair(userId: string): TokenPairDto {
     return {
-      accessToken: this.signAccessJwtToken(userId),
-      refreshToken: this.signRefreshJwtToken(userId),
+      access_token: this.signAccessJwtToken(userId),
+      refresh_token: this.signRefreshJwtToken(userId),
     };
   }
 
@@ -166,5 +304,63 @@ export class AuthService {
     hashPassword: string,
   ): boolean {
     return bcrypt.compareSync(plainPassword, hashPassword);
+  }
+
+  private async generateUniqueUsername(seed: string): Promise<string> {
+    const normalized = seed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .replace(/^-+|-+$/g, '');
+    const base = normalized.length > 1 ? normalized : 'nexususer';
+    let candidate = base;
+    let suffix = 0;
+
+    while (await this.userService.findUserByUsername(candidate)) {
+      suffix += 1;
+      candidate = `${base}${suffix}`;
+    }
+
+    return candidate;
+  }
+
+  private getCookieOptions(path: string, ttlMinutes: number): CookieOptions {
+    const secure = this.isProduction();
+    const sameSite: CookieOptions['sameSite'] = secure ? 'none' : 'lax';
+
+    return {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path,
+      maxAge: ttlMinutes * 60 * 1000,
+    };
+  }
+
+  private getAccessTokenTtlMinutes(): number {
+    return (
+      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15
+    );
+  }
+
+  private getRefreshTokenTtlMinutes(): number {
+    return (
+      this.configService.get<number>('auth.refreshJwtExpiresInMinute') ??
+      60 * 24
+    );
+  }
+
+  private isProduction(): boolean {
+    return (
+      (this.configService.get<string>('app.env') ?? 'development') ===
+      'production'
+    );
+  }
+
+  private getGoogleClient(): OAuth2Client {
+    if (!this.googleClient || !this.googleAudience) {
+      throw new BadRequestException('Google OAuth is not configured');
+    }
+
+    return this.googleClient;
   }
 }
