@@ -13,8 +13,18 @@ import { MailerModule } from '@/common/service/mail/mail.module';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard, RefreshTokenGuard, EmailVerificationService],
+  providers: [
+    AuthService,
+    AuthGuard,
+    RefreshTokenGuard,
+    EmailVerificationService,
+  ],
   exports: [AuthService, AuthGuard, RefreshTokenGuard],
-  imports: [UserModule, JwtModule.register({}), TypeOrmModule.forFeature([EmailVerification]), MailerModule],
+  imports: [
+    UserModule,
+    JwtModule.register({}),
+    TypeOrmModule.forFeature([EmailVerification]),
+    MailerModule,
+  ],
 })
 export class AuthModule {}

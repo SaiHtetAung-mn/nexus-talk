@@ -1,12 +1,12 @@
-import { Module } from "@nestjs/common";
-import { MailService } from "./mail-service";
-import { ResendMailService } from "./resend-mailer";
+import { Module } from '@nestjs/common';
+import { MailService } from './mail-service';
+import { NodemailerMailService } from './nodemailer-mailer';
 
 @Module({
   providers: [
     {
       provide: MailService,
-      useClass: ResendMailService,
+      useClass: NodemailerMailService,
     },
   ],
   exports: [MailService],

@@ -24,7 +24,12 @@ class HttpExceptionFilter implements ExceptionFilter {
       !Array.isArray(rawResponse)
     ) {
       const payload = rawResponse as Record<string, unknown>;
-      const processedKeys = new Set(['message', 'fieldErrors', 'token_expired', 'tokenExpired']);
+      const processedKeys = new Set([
+        'message',
+        'fieldErrors',
+        'token_expired',
+        'tokenExpired',
+      ]);
       if (typeof payload.message === 'string') {
         message = payload.message;
       } else if (Array.isArray(payload.message)) {
