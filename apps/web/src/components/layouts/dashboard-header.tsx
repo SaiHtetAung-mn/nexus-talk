@@ -1,15 +1,34 @@
-import { LogOut, Menu } from "lucide-react";
-import { useMemo } from "react";
+import { Menu } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import type { UserPayload } from "@/features/auth/api/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type DashboardHeaderProps = {
   sectionLabel?: string;
   onToggleSidebar: () => void;
   onLogout: () => void;
+  onNavigateProfile?: () => void;
   currentUser?: UserPayload | null;
 };
 
@@ -17,60 +36,106 @@ export function DashboardHeader({
   sectionLabel,
   onToggleSidebar,
   onLogout,
+  onNavigateProfile,
   currentUser,
 }: DashboardHeaderProps) {
-  const subtitle = useMemo(() => {
-    if (currentUser?.username) {
-      return `@${currentUser.username}`;
-    }
-    return currentUser?.email ?? "Signed in";
-  }, [currentUser]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const displayName = currentUser?.name ?? currentUser?.email ?? "Account";
+  const subtitle =
+    currentUser?.username ? `@${currentUser.username}` : currentUser?.email ?? "";
+
+  function handleProfileSelect(event: Event) {
+    event.preventDefault();
+    onNavigateProfile?.();
+  }
+
+  function handleLogoutSelect(event: Event) {
+    event.preventDefault();
+    setConfirmOpen(true);
+  }
+
+  function handleConfirmLogout() {
+    setConfirmOpen(false);
+    onLogout();
+  }
 
   return (
-    <header className="flex flex-col gap-4 border-b bg-background/80 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm uppercase text-muted-foreground">
-          Currently viewing
-        </p>
-        <h1 className="text-2xl font-semibold capitalize">
-          {sectionLabel ?? "Overview"}
-        </h1>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="flex items-center gap-2">
+    <header className="flex h-16 items-center border-b bg-background/80 px-4 sm:px-6">
+      <div className="flex flex-1 items-center gap-3">
         <Button
           type="button"
           className="md:hidden"
           variant="outline"
-          onClick={onToggleSidebar}
-        >
-          <Menu className="mr-2 h-4 w-4" />
-          Menu
-        </Button>
-        <Button type="button" variant="secondary" className="hidden md:inline-flex">
-          Create Room
-        </Button>
-        <ThemeToggle />
-        <Button
-          type="button"
-          variant="outline"
-          className="hidden sm:inline-flex"
-          onClick={onLogout}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
           size="icon"
-          className="sm:hidden"
-          onClick={onLogout}
-          aria-label="Logout"
+          onClick={onToggleSidebar}
+          aria-label="Toggle navigation"
         >
-          <LogOut className="h-5 w-5" />
+          <Menu className="h-4 w-4" />
         </Button>
-        <ProfileAvatar name={currentUser?.name} email={currentUser?.email} />
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-muted-foreground">
+            Nexus Talk
+          </span>
+          <span className="text-base font-medium capitalize">
+            {sectionLabel ?? "Workspace"}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className="group flex items-center gap-2 rounded-full px-2 py-1.5"
+            >
+              <ProfileAvatar
+                name={currentUser?.name}
+                email={currentUser?.email}
+              />
+              <div className="hidden text-left sm:flex sm:flex-col">
+                <span className="text-sm font-semibold leading-tight">
+                  {displayName}
+                </span>
+                {subtitle && (
+                  <span className="text-xs text-muted-foreground">
+                    {subtitle}
+                  </span>
+                )}
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Signed in as</DropdownMenuLabel>
+            <p className="px-2 text-sm text-muted-foreground">{displayName}</p>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={handleProfileSelect}>
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleLogoutSelect}>
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Sign out?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You will need to sign in again to access your conversations.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmLogout}>
+                Logout
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </header>
   );

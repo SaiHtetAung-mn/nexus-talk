@@ -14,6 +14,7 @@ import { RegisterPage } from "@/features/auth/pages/register-page";
 import { NotFoundRoute } from "@/pages/not-found";
 import { ProtectedRoute } from "@/routes/components/protected-route";
 import { GuestRoute } from "@/routes/components/guest-route";
+import { ProfilePage } from "@/features/account/pages/profile-page";
 
 export const router = createBrowserRouter(
   createRoutesFromElements(
@@ -23,6 +24,7 @@ export const router = createBrowserRouter(
           <Route path="/" element={<HomePage />} />
           <Route path="/calls" element={<CallsPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
       <Route element={<GuestRoute />}>
