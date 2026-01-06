@@ -19,7 +19,6 @@ import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import type { CookieOptions, Response } from 'express';
 import { authCookie } from '@/common/constants/auth-cookie.constant';
 import { TokenExpiredException } from './exceptions/token-expired.exception';
-
 type JwtPayload = {
   userId: string;
   iat?: number;
@@ -128,6 +127,26 @@ export class AuthService {
     );
   }
 
+  clearAuthCookies(res: Response) {
+    const baseAccess = this.getCookieOptions(
+      '/',
+      this.getAccessTokenTtlMinutes(),
+    );
+    const baseRefresh = this.getCookieOptions(
+      '/auth/refresh',
+      this.getRefreshTokenTtlMinutes(),
+    );
+
+    res.cookie(authCookie.ACCESS_TOKEN_COOKIE, '', {
+      ...baseAccess,
+      maxAge: 0,
+    });
+    res.cookie(authCookie.REFRESH_TOKEN_COOKIE, '', {
+      ...baseRefresh,
+      maxAge: 0,
+    });
+  }
+
   async loginWithGoogle(dto: GoogleOAuthDto): Promise<AuthResultDto> {
     const client = this.getGoogleClient();
     const ticket = await client.verifyIdToken({
@@ -230,10 +249,10 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException('Access token has expired');
+        throw new TokenExpiredException();
       }
       throw new UnauthorizedException({
-        message: 'Invalid access token',
+        message: 'Unauthorized',
       });
     }
   }
@@ -248,10 +267,10 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-          throw new TokenExpiredException('Refresh token has expired');
+        throw new TokenExpiredException();
       }
       throw new UnauthorizedException({
-        message: 'Invalid refresh token',
+        message: 'Unauthorized',
       });
     }
   }
@@ -337,9 +356,7 @@ export class AuthService {
   }
 
   private getAccessTokenTtlMinutes(): number {
-    return (
-      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15
-    );
+    return 60;
   }
 
   private getRefreshTokenTtlMinutes(): number {
