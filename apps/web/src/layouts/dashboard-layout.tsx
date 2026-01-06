@@ -28,6 +28,10 @@ export function DashboardLayout() {
     }
   }
 
+  function handleNavigateProfile() {
+    navigate("/profile");
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
       <AppSidebar isOpen={isSidebarOpen} onToggle={toggleSidebar} />
@@ -38,8 +42,9 @@ export function DashboardLayout() {
           onToggleSidebar={toggleSidebar}
           currentUser={user}
           onLogout={handleLogout}
+          onNavigateProfile={handleNavigateProfile}
         />
-        <div className="flex-1 overflow-y-auto px-6 py-10">
+        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
           <Outlet />
         </div>
       </main>
