@@ -249,8 +249,7 @@ export class AuthService {
     const user = await this.userService.findUserByEmail(normalizedEmail);
     if (!user) {
       return {
-        message:
-          'If the account exists, a verification email has been sent.',
+        message: 'If the account exists, a verification email has been sent.',
       };
     }
 
@@ -409,9 +408,7 @@ export class AuthService {
       return;
     }
 
-    const { token } = await this.emailVerificationService.createToken(
-      user._id,
-    );
+    const { token } = await this.emailVerificationService.createToken(user._id);
     const verifyLink = this.buildVerificationLink(token);
     const greeting = user.name ? `Hi ${user.name.split(' ')[0]},` : 'Hi there,';
     const html = `

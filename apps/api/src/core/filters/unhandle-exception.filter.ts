@@ -18,8 +18,7 @@ class UnhandleExceptionFilter implements ExceptionFilter {
       throw exception;
     }
 
-    const message =
-      exception instanceof Error ? exception.message : 'Internal server error';
+    const message = 'Internal server error';
 
     this.logger.error('Unhandled Error', exception);
 

@@ -17,8 +17,7 @@ export class EmailVerificationService {
     userId: string | ObjectId,
     ttlMinutes = 60 * 24,
   ): Promise<{ token: string; expiresAt: Date }> {
-    const objectId =
-      typeof userId === 'string' ? new ObjectId(userId) : userId;
+    const objectId = typeof userId === 'string' ? new ObjectId(userId) : userId;
 
     await this.repository.deleteMany({ user_id: objectId.toString() });
 
@@ -36,9 +35,7 @@ export class EmailVerificationService {
     return { token, expiresAt };
   }
 
-  async consumeToken(
-    token: string,
-  ): Promise<EmailVerification | null> {
+  async consumeToken(token: string): Promise<EmailVerification | null> {
     const record = await this.repository.findOne({
       where: { token },
     });
