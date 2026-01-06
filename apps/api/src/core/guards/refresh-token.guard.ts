@@ -15,21 +15,17 @@ export type RefreshTokenRequest = Request & {
 @Injectable()
 export class RefreshTokenGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    try {
-      const request = context.switchToHttp().getRequest<RefreshTokenRequest>();
+    const request = context.switchToHttp().getRequest<RefreshTokenRequest>();
 
-      const cookies =
-        (request.cookies as Partial<Record<string, string | undefined>>) ?? {};
-      const refreshToken = cookies[authCookie.REFRESH_TOKEN_COOKIE] ?? null;
+    const cookies =
+      (request.cookies as Partial<Record<string, string | undefined>>) ?? {};
+    const refreshToken = cookies[authCookie.REFRESH_TOKEN_COOKIE] ?? null;
 
-      if (!refreshToken) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
-      request.refreshToken = refreshToken;
-      return true;
-    } catch (err) {
-      return false;
+    if (!refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
+
+    request.refreshToken = refreshToken;
+    return true;
   }
 }

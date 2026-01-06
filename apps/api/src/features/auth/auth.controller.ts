@@ -69,6 +69,14 @@ export class AuthController {
   }
 
   @UseGuards(AuthGuard)
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Res({ passthrough: true }) res: Response) {
+    this.authService.clearAuthCookies(res);
+    return { message: 'Logged out successfully' };
+  }
+
+  @UseGuards(AuthGuard)
   @Get('me')
   getCurrentUser(@Req() req: AuthenticatedRequest) {
     return { user: req.user };
