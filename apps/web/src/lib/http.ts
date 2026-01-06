@@ -15,6 +15,7 @@ type ApiErrorResponse = {
     message?: string;
     fieldErrors?: Record<string, string>;
     token_expired?: boolean;
+    [key: string]: unknown;
   };
 };
 
@@ -87,13 +88,20 @@ http.interceptors.response.use(
       }
     }
 
-    if (apiErrorData?.error?.message) {
+    if (apiErrorData?.error) {
       const statusCode = apiErrorData.statusCode ?? status ?? 500;
+      const { message, fieldErrors, ...details } = apiErrorData.error;
+      const normalizedMessage =
+        typeof message === "string"
+          ? message
+          : "Something went wrong. Please try again.";
+
       return Promise.reject(
         new ApiError(
-          apiErrorData.error.message,
+          normalizedMessage,
           statusCode,
-          apiErrorData.error.fieldErrors,
+          fieldErrors,
+          Object.keys(details).length ? details : undefined,
         ),
       );
     }

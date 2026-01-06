@@ -31,6 +31,7 @@ export interface ApiErrorResponse extends ApiResponse<null> {
     message: string;
     fieldErrors?: { [field: string]: string };
     token_expired?: boolean;
+    [key: string]: unknown;
   };
 }
 

@@ -18,6 +18,9 @@ import { useAuthStore } from "@/features/auth/store/auth-store";
 
 export function LoginForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<
+    string | null
+  >(null);
   const navigate = useNavigate();
   const setAuthUser = useAuthStore((state) => state.setUser);
   const {
@@ -42,11 +45,18 @@ export function LoginForm() {
       setStatus("success");
       setTimeout(() => setStatus("idle"), 1500);
       toast.success("Signed in successfully");
+      setPendingVerificationEmail(null);
     } catch (error) {
       if (isApiError(error) && error.fieldErrors) {
         Object.entries(error.fieldErrors).forEach(([field, message]) => {
           setError(field as keyof LoginValues, { message });
         });
+      }
+
+      if (isApiError(error) && error.details?.requires_verification) {
+        setPendingVerificationEmail(values.email);
+      } else {
+        setPendingVerificationEmail(null);
       }
 
       const message =
@@ -99,6 +109,26 @@ export function LoginForm() {
       >
         {status === "loading" ? "Checking..." : "Sign in"}
       </Button>
+      {pendingVerificationEmail && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mb-2">
+            {pendingVerificationEmail} still needs to be verified before you can
+            sign in.
+          </p>
+          <button
+            type="button"
+            className="text-sm font-medium text-primary hover:underline"
+            onClick={() => {
+              const params = new URLSearchParams({
+                email: pendingVerificationEmail,
+              });
+              navigate(`/auth/verify?${params.toString()}`);
+            }}
+          >
+            Continue to verification
+          </button>
+        </div>
+      )}
       <p className="text-center text-sm text-muted-foreground">
         No account?{" "}
         <Link to="/auth/register" className="font-medium text-primary">

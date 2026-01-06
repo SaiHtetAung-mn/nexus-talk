@@ -11,6 +11,7 @@ import { CallsPage } from "@/features/workspace/pages/calls-page";
 import { ContactsPage } from "@/features/workspace/pages/contacts-page";
 import { LoginPage } from "@/features/auth/pages/login-page";
 import { RegisterPage } from "@/features/auth/pages/register-page";
+import { VerifyEmailPage } from "@/features/auth/pages/verify-email-page";
 import { NotFoundRoute } from "@/pages/not-found";
 import { ProtectedRoute } from "@/routes/components/protected-route";
 import { GuestRoute } from "@/routes/components/guest-route";
@@ -31,6 +32,7 @@ export const router = createBrowserRouter(
         <Route path="/auth" element={<AuthLayout />}>
           <Route index element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="verify" element={<VerifyEmailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundRoute />} />

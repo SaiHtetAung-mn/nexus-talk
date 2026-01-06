@@ -10,6 +10,7 @@ import RequestLoggerMiddleware from './core/middlewares/request-logger.middlewar
 import authConfig from './config/auth.config';
 import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/users.module';
+import resendMailerConfig from './config/resend-mailer.config';
 
 @Module({
   imports: [
@@ -17,7 +18,9 @@ import { UserModule } from './features/user/users.module';
       isGlobal: true,
       envFilePath: '.env',
       validationSchema: envValidationSchema,
-      load: [appConfig, databaseConfig, authConfig],
+      load: [
+        appConfig, databaseConfig, authConfig, resendMailerConfig
+      ],
     }),
     DatabaseModule,
     ThrottlerModule.forRootAsync({
