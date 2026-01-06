@@ -16,6 +16,7 @@ class HttpExceptionFilter implements ExceptionFilter {
     let message = exception.message;
     let fieldErrors: Record<string, string> | undefined;
     let tokenExpired = false;
+    const extraDetails: Record<string, unknown> = {};
 
     if (
       rawResponse &&
@@ -23,6 +24,7 @@ class HttpExceptionFilter implements ExceptionFilter {
       !Array.isArray(rawResponse)
     ) {
       const payload = rawResponse as Record<string, unknown>;
+      const processedKeys = new Set(['message', 'fieldErrors', 'token_expired', 'tokenExpired']);
       if (typeof payload.message === 'string') {
         message = payload.message;
       } else if (Array.isArray(payload.message)) {
@@ -51,6 +53,12 @@ class HttpExceptionFilter implements ExceptionFilter {
       if (typeof tokenFlag === 'boolean') {
         tokenExpired = tokenFlag;
       }
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (!processedKeys.has(key)) {
+          extraDetails[key] = value;
+        }
+      });
     }
 
     const response: ApiErrorResponse = {
@@ -61,6 +69,7 @@ class HttpExceptionFilter implements ExceptionFilter {
         message,
         fieldErrors,
         token_expired: tokenExpired || undefined,
+        ...extraDetails,
       },
     };
 

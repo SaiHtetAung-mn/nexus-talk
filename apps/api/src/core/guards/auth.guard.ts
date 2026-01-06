@@ -9,7 +9,6 @@ import type { Request } from 'express';
 import { AuthService } from '@/features/auth/auth.service';
 import { authCookie } from '@/common/constants/auth-cookie.constant';
 import type { UserResponseDto } from '@/features/user/dto/user-response.dto';
-import { TokenExpiredException } from '@/features/auth/exceptions/token-expired.exception';
 
 export type AuthenticatedRequest = Request & {
   user?: UserResponseDto;
@@ -38,10 +37,23 @@ export class AuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      if (error instanceof TokenExpiredException) {
+      if (
+        error instanceof UnauthorizedException &&
+        typeof error.getResponse === 'function'
+      ) {
+        const response = error.getResponse();
+        const message =
+          typeof response === 'object' && response !== null
+            ? (response as { message?: string }).message
+            : undefined;
+        const tokenExpired =
+          typeof response === 'object' &&
+          response !== null &&
+          (response as { token_expired?: boolean }).token_expired === true;
+
         throw new UnauthorizedException({
-          message: 'Unauthorized',
-          token_expired: true,
+          message: message ?? 'Unauthorized',
+          token_expired: tokenExpired,
         });
       }
 

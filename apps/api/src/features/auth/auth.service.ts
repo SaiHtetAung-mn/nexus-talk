@@ -18,7 +18,8 @@ import { AuthResultDto, TokenPairDto } from './dto/auth-result.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import type { CookieOptions, Response } from 'express';
 import { authCookie } from '@/common/constants/auth-cookie.constant';
-import { TokenExpiredException } from './exceptions/token-expired.exception';
+import { MailService } from '@/common/service/mail/mail-service';
+import { EmailVerificationService } from './email-verification.service';
 type JwtPayload = {
   userId: string;
   iat?: number;
@@ -34,13 +35,15 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {
     const clientId = this.configService.get<string>('auth.googleOAuthClientId');
     this.googleClient = clientId ? new OAuth2Client(clientId) : null;
     this.googleAudience = clientId ?? null;
   }
 
-  async register(payload: RegisterDto): Promise<AuthResultDto> {
+  async register(payload: RegisterDto): Promise<{ message: string }> {
     const email = payload.email.toLowerCase().trim();
     const username = payload.username.trim();
 
@@ -64,7 +67,11 @@ export class AuthService {
       is_email_verified: false,
     });
 
-    return this.buildAuthResult(user);
+    await this.sendVerificationEmail(user);
+
+    return {
+      message: 'Verification link has been sent to your email address.',
+    };
   }
 
   async login(payload: LoginDto): Promise<AuthResultDto> {
@@ -82,6 +89,13 @@ export class AuthService {
 
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.is_email_verified) {
+      throw new UnauthorizedException({
+        message: 'Please verify your email before signing in.',
+        requires_verification: true,
+      });
     }
 
     return this.buildAuthResult(user);
@@ -208,6 +222,48 @@ export class AuthService {
     return this.buildAuthResult(user);
   }
 
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const verification =
+      await this.emailVerificationService.consumeToken(token);
+    if (!verification) {
+      throw new BadRequestException('Verification link is invalid or expired.');
+    }
+
+    const user = await this.userService.findUserById(verification.user_id);
+    if (!user) {
+      throw new BadRequestException('User no longer exists');
+    }
+
+    if (user.is_email_verified) {
+      return { message: 'Email already verified.' };
+    }
+
+    user.is_email_verified = true;
+    await this.userService.saveUser(user);
+
+    return { message: 'Email verified successfully.' };
+  }
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await this.userService.findUserByEmail(normalizedEmail);
+    if (!user) {
+      return {
+        message:
+          'If the account exists, a verification email has been sent.',
+      };
+    }
+
+    if (user.is_email_verified) {
+      return { message: 'Email is already verified.' };
+    }
+
+    await this.sendVerificationEmail(user);
+    return {
+      message: 'Verification email sent. Please check your inbox.',
+    };
+  }
+
   async getCurrentUser(accessToken?: string | null): Promise<UserResponseDto> {
     if (!accessToken) {
       throw new UnauthorizedException({
@@ -249,10 +305,13 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException();
+        throw new UnauthorizedException({
+          message: 'Access token has expired',
+          token_expired: true,
+        });
       }
       throw new UnauthorizedException({
-        message: 'Unauthorized',
+        message: 'Invalid access token',
       });
     }
   }
@@ -267,10 +326,13 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException();
+        throw new UnauthorizedException({
+          message: 'Refresh token has expired',
+          token_expired: true,
+        });
       }
       throw new UnauthorizedException({
-        message: 'Unauthorized',
+        message: 'Invalid refresh token',
       });
     }
   }
@@ -342,6 +404,40 @@ export class AuthService {
     return candidate;
   }
 
+  private async sendVerificationEmail(user: User): Promise<void> {
+    if (!user._id) {
+      return;
+    }
+
+    const { token } = await this.emailVerificationService.createToken(
+      user._id,
+    );
+    const verifyLink = this.buildVerificationLink(token);
+    const greeting = user.name ? `Hi ${user.name.split(' ')[0]},` : 'Hi there,';
+    const html = `
+      <p>${greeting}</p>
+      <p>Thanks for signing up for Nexus Talk. Please confirm your email address to activate your account.</p>
+      <p><a href="${verifyLink}" target="_blank">Verify my email</a></p>
+      <p>If the button does not work, copy and paste this link into your browser:</p>
+      <p>${verifyLink}</p>
+      <p>This link expires in 24 hours.</p>
+    `;
+
+    await this.mailService.send(
+      user.email,
+      'Verify your Nexus Talk account',
+      html,
+    );
+  }
+
+  private buildVerificationLink(token: string): string {
+    const webUrl =
+      this.configService.get<string>('app.webUrl') ?? 'http://localhost:5173';
+    const baseUrl = webUrl.endsWith('/') ? webUrl.slice(0, -1) : webUrl;
+    const encodedToken = encodeURIComponent(token);
+    return `${baseUrl}/auth/verify?token=${encodedToken}`;
+  }
+
   private getCookieOptions(path: string, ttlMinutes: number): CookieOptions {
     const secure = this.isProduction();
     const sameSite: CookieOptions['sameSite'] = secure ? 'none' : 'lax';
@@ -356,7 +452,9 @@ export class AuthService {
   }
 
   private getAccessTokenTtlMinutes(): number {
-    return 60;
+    return (
+      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15
+    );
   }
 
   private getRefreshTokenTtlMinutes(): number {

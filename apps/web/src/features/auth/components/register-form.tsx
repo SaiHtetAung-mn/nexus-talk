@@ -14,13 +14,11 @@ import {
   type RegisterValues,
 } from "@/features/auth/schemas/register-schema";
 import { registerUser } from "@/features/auth/api/register";
-import { useAuthStore } from "@/features/auth/store/auth-store";
 
 export function RegisterForm() {
-  const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [step, setStep] = useState<"email" | "details">("email");
   const navigate = useNavigate();
-  const setAuthUser = useAuthStore((state) => state.setUser);
   const {
     register,
     handleSubmit,
@@ -41,12 +39,13 @@ export function RegisterForm() {
   async function onSubmit(values: RegisterValues) {
     setStatus("loading");
     try {
-      const data = await registerUser(values);
-      setAuthUser(data.user);
-      navigate("/", { replace: true });
-      setStatus("success");
-      setTimeout(() => setStatus("idle"), 2000);
-      toast.success("Account created! You can start chatting now.");
+      const response = await registerUser(values);
+      const params = new URLSearchParams({
+        email: values.email,
+      });
+      toast.success(response.message);
+      navigate(`/auth/verify?${params.toString()}`, { replace: true });
+      setStatus("idle");
     } catch (error) {
       setStatus("idle");
       if (isApiError(error) && error.fieldErrors) {
@@ -182,11 +181,6 @@ export function RegisterForm() {
           Sign in
         </Link>
       </p>
-      {status === "success" && (
-        <p className="rounded-md bg-indigo-100 px-3 py-2 text-center text-sm font-medium text-indigo-900">
-          Account created! You can start chatting now.
-        </p>
-      )}
     </form>
   );
 }

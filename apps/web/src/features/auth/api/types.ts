@@ -17,3 +17,7 @@ export type AuthResponse = {
     refresh_token: string;
   };
 };
+
+export type MessageResponse = {
+  message: string;
+};

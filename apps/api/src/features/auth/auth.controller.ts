@@ -21,6 +21,8 @@ import {
   RefreshTokenGuard,
   type RefreshTokenRequest,
 } from '../../core/guards/refresh-token.guard';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 @Controller('/auth')
 export class AuthController {
@@ -30,11 +32,8 @@ export class AuthController {
   @HttpCode(200)
   async register(
     @Body() body: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.register(body);
-    this.authService.attachAuthCookies(res, result.tokens);
-    return result;
+    return this.authService.register(body);
   }
 
   @Post('login')
@@ -66,6 +65,18 @@ export class AuthController {
     const result = await this.authService.loginWithGoogle(body);
     this.authService.attachAuthCookies(res, result.tokens);
     return result;
+  }
+
+  @Post('verify-email')
+  @HttpCode(200)
+  verifyEmail(@Body() body: VerifyEmailDto) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  @Post('verification/resend')
+  @HttpCode(200)
+  resendVerification(@Body() body: ResendVerificationDto) {
+    return this.authService.resendVerification(body.email);
   }
 
   @UseGuards(AuthGuard)

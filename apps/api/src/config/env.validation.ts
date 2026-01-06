@@ -5,6 +5,9 @@ export const envValidationSchema = Joi.object({
     .valid('development', 'production')
     .default('development'),
   APP_NAME: Joi.string().default('Nexus Talk API'),
+  APP_WEB_URL: Joi.string()
+    .uri()
+    .default('http://localhost:5173'),
   PORT: Joi.number().default(3000),
   DATABASE_URL: Joi.string().uri().required(),
   JWT_ACCESS_SECRET: Joi.string().min(5).required(),
@@ -17,4 +20,7 @@ export const envValidationSchema = Joi.object({
   GOOGLE_OAUTH_CLIENT_ID: Joi.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: Joi.string().optional(),
   SWAGGER_ENABLED: Joi.boolean().default(true),
+  RESEND_API_KEY: Joi.string().optional(),
+  MAIL_FROM_EMAIL: Joi.string().email().required(),
+  MAIL_FROM_NAME: Joi.string().default('Nexus Talk'),
 }).unknown(true);
