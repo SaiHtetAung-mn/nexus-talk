@@ -17,7 +17,7 @@ export type AuthenticatedRequest = Request & {
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -38,16 +38,11 @@ export class AuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      if (
-        error instanceof UnauthorizedException &&
-        typeof error.getResponse === 'function'
-      ) {
-        if (error instanceof TokenExpiredException) {
-          throw new UnauthorizedException({
-            message: error.message,
-            token_expired: true,
-          })
-        }
+      if (error instanceof TokenExpiredException) {
+        throw new UnauthorizedException({
+          message: error.message,
+          token_expired: true,
+        })
       }
 
       throw error;

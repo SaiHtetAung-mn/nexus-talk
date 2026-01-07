@@ -415,7 +415,7 @@ export class AuthService {
 
   private signAccessJwtToken(userId: string, sessionId: string): string {
     const payload: JwtPayload = { userId, sessionId };
-    const ttl = 60;
+    const ttl = this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15;
 
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('auth.accessJwtSecret'),
