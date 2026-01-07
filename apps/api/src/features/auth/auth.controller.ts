@@ -23,6 +23,7 @@ import {
 } from '../../core/guards/refresh-token.guard';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { authCookie } from '@/common/constants/auth-cookie.constant';
 
 @Controller('/auth')
 export class AuthController {
@@ -80,7 +81,14 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @Post('logout')
   @HttpCode(200)
-  logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const cookies =
+      (req.cookies as Partial<Record<string, string | undefined>>) ?? {};
+    const refreshToken = cookies[authCookie.REFRESH_TOKEN_COOKIE] ?? null;
+    await this.authService.invalidateRefreshToken(refreshToken);
     this.authService.clearAuthCookies(res);
     return { message: 'Logged out successfully' };
   }

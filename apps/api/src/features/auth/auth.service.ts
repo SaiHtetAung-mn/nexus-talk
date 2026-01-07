@@ -20,10 +20,18 @@ import type { CookieOptions, Response } from 'express';
 import { authCookie } from '@/common/constants/auth-cookie.constant';
 import { MailService } from '@/common/service/mail/mail-service';
 import { EmailVerificationService } from './email-verification.service';
+import { RefreshTokenService } from './refresh-token.service';
+import { TokenExpiredException } from './exceptions/token-expired.exception';
 type JwtPayload = {
   userId: string;
+  sessionId: string;
   iat?: number;
   exp?: number;
+};
+
+type IssueTokenOptions = {
+  sessionId?: string;
+  currentRefreshToken?: string | null;
 };
 
 @Injectable()
@@ -37,6 +45,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {
     const clientId = this.configService.get<string>('auth.googleOAuthClientId');
     this.googleClient = clientId ? new OAuth2Client(clientId) : null;
@@ -107,7 +116,7 @@ export class AuthService {
     }
 
     const payload = this.verifyRefreshJwtToken(refreshToken);
-    if (!payload?.userId) {
+    if (!payload?.userId || !payload?.sessionId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -116,7 +125,10 @@ export class AuthService {
       throw new UnauthorizedException('User no longer exists');
     }
 
-    return this.buildAuthResult(user);
+    return this.buildAuthResult(user, {
+      sessionId: payload.sessionId,
+      currentRefreshToken: refreshToken,
+    });
   }
 
   attachAuthCookies(res: Response, tokens: TokenPairDto) {
@@ -159,6 +171,24 @@ export class AuthService {
       ...baseRefresh,
       maxAge: 0,
     });
+  }
+
+  async invalidateRefreshToken(refreshToken?: string | null): Promise<void> {
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      const payload = this.verifyRefreshJwtToken(refreshToken);
+      if (payload?.sessionId) {
+        await this.refreshTokenService.deleteSession(payload.sessionId);
+        return;
+      }
+    } catch {
+      // Ignore verification errors; fall back to hashed lookup instead.
+    }
+
+    await this.refreshTokenService.deleteByToken(refreshToken);
   }
 
   async loginWithGoogle(dto: GoogleOAuthDto): Promise<AuthResultDto> {
@@ -304,13 +334,10 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new UnauthorizedException({
-          message: 'Access token has expired',
-          token_expired: true,
-        });
+        throw new TokenExpiredException;
       }
       throw new UnauthorizedException({
-        message: 'Invalid access token',
+        message: 'Unauthorized',
       });
     }
   }
@@ -325,38 +352,70 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new UnauthorizedException({
-          message: 'Refresh token has expired',
-          token_expired: true,
-        });
+        throw new TokenExpiredException
       }
       throw new UnauthorizedException({
-        message: 'Invalid refresh token',
+        message: 'Unauthorized',
       });
     }
   }
 
-  private buildAuthResult(user: User): AuthResultDto {
-    const tokens = this.buildTokenPair(user._id?.toString() ?? '');
+  private async buildAuthResult(
+    user: User,
+    options?: IssueTokenOptions,
+  ): Promise<AuthResultDto> {
+    const userId = user._id?.toString();
+
+    if (!userId) {
+      throw new UnauthorizedException('Unable to issue tokens for user');
+    }
+
+    const sessionId =
+      options?.sessionId ?? this.refreshTokenService.generateSessionId();
+    const tokens = this.buildTokenPair(userId, sessionId);
     const safeUser = this.userService.toResponse(user);
 
+    if (!safeUser) {
+      throw new UnauthorizedException({
+        message: 'Unable to load user profile',
+      });
+    }
+
+    const refreshExpiresAt = this.getRefreshTokenExpiryDate();
+
+    if (options?.sessionId && options.currentRefreshToken) {
+      await this.refreshTokenService.rotateSession({
+        sessionId,
+        userId,
+        currentToken: options.currentRefreshToken,
+        nextToken: tokens.refresh_token,
+        expiresAt: refreshExpiresAt,
+      });
+    } else {
+      await this.refreshTokenService.createSession({
+        sessionId,
+        userId,
+        refreshToken: tokens.refresh_token,
+        expiresAt: refreshExpiresAt,
+      });
+    }
+
     return {
-      user: safeUser!,
+      user: safeUser,
       tokens,
     };
   }
 
-  private buildTokenPair(userId: string): TokenPairDto {
+  private buildTokenPair(userId: string, sessionId: string): TokenPairDto {
     return {
-      access_token: this.signAccessJwtToken(userId),
-      refresh_token: this.signRefreshJwtToken(userId),
+      access_token: this.signAccessJwtToken(userId, sessionId),
+      refresh_token: this.signRefreshJwtToken(userId, sessionId),
     };
   }
 
-  private signAccessJwtToken(userId: string): string {
-    const payload: JwtPayload = { userId };
-    const ttl =
-      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15;
+  private signAccessJwtToken(userId: string, sessionId: string): string {
+    const payload: JwtPayload = { userId, sessionId };
+    const ttl = 60;
 
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('auth.accessJwtSecret'),
@@ -364,8 +423,8 @@ export class AuthService {
     });
   }
 
-  private signRefreshJwtToken(userId: string): string {
-    const payload: JwtPayload = { userId };
+  private signRefreshJwtToken(userId: string, sessionId: string): string {
+    const payload: JwtPayload = { userId, sessionId };
     const ttl =
       this.configService.get<number>('auth.refreshJwtExpiresInMinute') ?? 60;
 
@@ -450,7 +509,7 @@ export class AuthService {
 
   private getAccessTokenTtlMinutes(): number {
     return (
-      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15
+      60
     );
   }
 
@@ -459,6 +518,11 @@ export class AuthService {
       this.configService.get<number>('auth.refreshJwtExpiresInMinute') ??
       60 * 24
     );
+  }
+
+  private getRefreshTokenExpiryDate(): Date {
+    const ttlMinutes = this.getRefreshTokenTtlMinutes();
+    return new Date(Date.now() + ttlMinutes * 60 * 1000);
   }
 
   private isProduction(): boolean {

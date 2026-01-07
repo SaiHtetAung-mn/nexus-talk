@@ -10,6 +10,8 @@ import { RefreshTokenGuard } from '../../core/guards/refresh-token.guard';
 import { EmailVerification } from '@/database/entities/EmailVerification';
 import { EmailVerificationService } from './email-verification.service';
 import { MailerModule } from '@/common/service/mail/mail.module';
+import { RefreshToken } from '@/database/entities/RefreshToken';
+import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
   controllers: [AuthController],
@@ -18,12 +20,13 @@ import { MailerModule } from '@/common/service/mail/mail.module';
     AuthGuard,
     RefreshTokenGuard,
     EmailVerificationService,
+    RefreshTokenService,
   ],
   exports: [AuthService, AuthGuard, RefreshTokenGuard],
   imports: [
     UserModule,
     JwtModule.register({}),
-    TypeOrmModule.forFeature([EmailVerification]),
+    TypeOrmModule.forFeature([EmailVerification, RefreshToken]),
     MailerModule,
   ],
 })
