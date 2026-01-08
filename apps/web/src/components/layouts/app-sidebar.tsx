@@ -40,25 +40,39 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           isOpen ? "w-72" : "w-20",
         )}
       >
-        <div className="flex items-center justify-between border-b px-4 py-6">
-          <button
-            aria-label="Toggle navigation width"
-            className="rounded-md border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
-            onClick={onToggle}
-            type="button"
+        <div className="flex items-center justify-center border-b px-4 py-6">
+          <span
+            className={cn(
+              "text-sm font-semibold transition-opacity duration-200",
+              isOpen ? "opacity-100" : "opacity-0",
+            )}
+            aria-hidden={!isOpen}
           >
-            {isOpen ? "Collapse" : "Expand"}
-          </button>
-          {isOpen && (
-            <span className="text-sm font-semibold">Nexus Talk</span>
-          )}
+            Nexus Talk
+          </span>
         </div>
         <nav className="flex-1 space-y-1 px-2 py-4">{renderNavigation()}</nav>
-        {isOpen && (
-          <div className="border-t px-4 py-6 text-xs text-muted-foreground">
-            v0.1 – Core platform scaffolding
-          </div>
-        )}
+        <div className="border-t px-4 py-6">
+          {isOpen ? (
+            <button
+              aria-label="Collapse navigation"
+              className="w-full rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
+              onClick={onToggle}
+              type="button"
+            >
+              Collapse
+            </button>
+          ) : (
+            <button
+              aria-label="Expand navigation"
+              className="w-full rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
+              onClick={onToggle}
+              type="button"
+            >
+              Expand
+            </button>
+          )}
+        </div>
       </aside>
 
       <div
@@ -95,7 +109,13 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             {renderNavigation(true)}
           </nav>
           <div className="border-t px-4 py-6 text-xs text-muted-foreground">
-            v0.1 – Core platform scaffolding
+            <button
+              type="button"
+              className="w-full rounded-md border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
+              onClick={onToggle}
+            >
+              Close menu
+            </button>
           </div>
         </aside>
       </div>
