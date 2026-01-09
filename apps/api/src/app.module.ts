@@ -10,6 +10,7 @@ import RequestLoggerMiddleware from './core/middlewares/request-logger.middlewar
 import authConfig from './config/auth.config';
 import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/users.module';
+import { AccountModule } from './features/account/account.module';
 import mailConfig from './config/mail.config';
 
 @Module({
@@ -41,6 +42,7 @@ import mailConfig from './config/mail.config';
 
     /** Feature modules import */
     UserModule,
+    AccountModule,
     AuthModule,
   ],
   providers: [

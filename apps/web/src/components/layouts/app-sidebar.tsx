@@ -1,3 +1,4 @@
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
@@ -40,38 +41,37 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           isOpen ? "w-72" : "w-20",
         )}
       >
-        <div className="flex items-center justify-center border-b px-4 py-6">
+        <div className="flex items-center justify-center border-b px-4 py-4">
           <span
             className={cn(
-              "text-sm font-semibold transition-opacity duration-200",
-              isOpen ? "opacity-100" : "opacity-0",
+              "inline-flex items-center justify-center transition-opacity duration-200",
             )}
-            aria-hidden={!isOpen}
           >
-            Nexus Talk
+            <img
+              src="./logo.png"
+              alt="Nexus Talk Logo"
+              className="h-8 w-auto max-w-full sm:h-9"
+            />
           </span>
         </div>
         <nav className="flex-1 space-y-1 px-2 py-4">{renderNavigation()}</nav>
         <div className="border-t px-4 py-6">
-          {isOpen ? (
-            <button
-              aria-label="Collapse navigation"
-              className="w-full rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
-              onClick={onToggle}
-              type="button"
-            >
-              Collapse
-            </button>
-          ) : (
-            <button
-              aria-label="Expand navigation"
-              className="w-full rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
-              onClick={onToggle}
-              type="button"
-            >
-              Expand
-            </button>
-          )}
+          <button
+            aria-label={isOpen ? "Collapse navigation" : "Expand navigation"}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
+            onClick={onToggle}
+            type="button"
+          >
+            {isOpen ? (
+              <>
+                <ChevronsLeft className="h-3.5 w-3.5" />
+              </>
+            ) : (
+              <>
+                <ChevronsRight className="h-3.5 w-3.5" />
+              </>
+            )}
+          </button>
         </div>
       </aside>
 
@@ -111,9 +111,10 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           <div className="border-t px-4 py-6 text-xs text-muted-foreground">
             <button
               type="button"
-              className="w-full rounded-md border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent"
               onClick={onToggle}
             >
+              <ChevronsLeft className="h-3.5 w-3.5" />
               Close menu
             </button>
           </div>

@@ -334,7 +334,7 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException;
+        throw new TokenExpiredException();
       }
       throw new UnauthorizedException({
         message: 'Unauthorized',
@@ -352,7 +352,7 @@ export class AuthService {
         error instanceof TokenExpiredError &&
         error.message === 'jwt expired'
       ) {
-        throw new TokenExpiredException
+        throw new TokenExpiredException();
       }
       throw new UnauthorizedException({
         message: 'Unauthorized',
@@ -415,7 +415,8 @@ export class AuthService {
 
   private signAccessJwtToken(userId: string, sessionId: string): string {
     const payload: JwtPayload = { userId, sessionId };
-    const ttl = this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15;
+    const ttl =
+      this.configService.get<number>('auth.accessJwtExpiresInMinute') ?? 15;
 
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('auth.accessJwtSecret'),
@@ -508,9 +509,7 @@ export class AuthService {
   }
 
   private getAccessTokenTtlMinutes(): number {
-    return (
-      60
-    );
+    return 60;
   }
 
   private getRefreshTokenTtlMinutes(): number {

@@ -60,6 +60,41 @@ export class UserService {
     return users.length > 0 ? users[0] : null;
   }
 
+  async findUserByIdWithPassword(id: string | ObjectId): Promise<User | null> {
+    const objectId =
+      typeof id === 'string'
+        ? ObjectId.isValid(id)
+          ? new ObjectId(id)
+          : null
+        : id;
+
+    if (!objectId) {
+      return null;
+    }
+
+    const users = (await this.userRepository
+      .aggregate([
+        { $match: { _id: objectId } },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1,
+            username: 1,
+            provider: 1,
+            provider_id: 1,
+            is_email_verified: 1,
+            created_at: 1,
+            updated_at: 1,
+            password: 1,
+          },
+        },
+      ])
+      .toArray()) as User[];
+
+    return users.length > 0 ? users[0] : null;
+  }
+
   async createUser(data: Partial<User>): Promise<User> {
     const user = this.userRepository.create(data);
     return this.userRepository.save(user);
