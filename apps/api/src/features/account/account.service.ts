@@ -8,6 +8,7 @@ import * as bcrypt from 'bcryptjs';
 import { UserService } from '@/features/user/user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import type { UserResponseDto } from '@/features/user/dto/user-response.dto';
 
 @Injectable()
@@ -63,9 +64,9 @@ export class AccountService {
       throw new NotFoundException('User not found');
     }
 
-    if (user.provider !== 'local' || !user.password) {
+    if (!user.password) {
       throw new BadRequestException(
-        'Password cannot be updated for social accounts.',
+        'No password set. Please create a password first.',
       );
     }
 
@@ -77,5 +78,27 @@ export class AccountService {
     user.password = bcrypt.hashSync(payload.newPassword.trim(), 10);
     await this.userService.saveUser(user);
     return { message: 'Password updated successfully' };
+  }
+
+  async setPassword(
+    userId: string,
+    payload: SetPasswordDto,
+  ): Promise<{ message: string }> {
+    const user = await this.userService.findUserById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.password) {
+      throw new BadRequestException(
+        'Password already set. Use change password instead.',
+      );
+    }
+
+    user.password = bcrypt.hashSync(payload.newPassword.trim(), 10);
+    user.provider = 'local';
+    await this.userService.saveUser(user);
+
+    return { message: 'Password created successfully' };
   }
 }

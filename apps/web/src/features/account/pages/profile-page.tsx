@@ -21,6 +21,11 @@ import { updateAccountProfile } from "@/features/account/api/update-profile";
 import { changePassword } from "@/features/account/api/change-password";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import type { UserPayload } from "@/features/auth/api/types";
+import {
+  setPasswordSchema,
+  type SetPasswordValues,
+} from "@/features/account/schemas/set-password-schema";
+import { createPassword } from "@/features/account/api/create-password";
 
 export function ProfilePage() {
   const setAuthUser = useAuthStore((state) => state.setUser);
@@ -28,6 +33,7 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<UserPayload | null>(user);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isCreatePasswordLoading, setIsCreatePasswordLoading] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -41,6 +47,14 @@ export function ProfilePage() {
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
       currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const createPasswordForm = useForm<SetPasswordValues>({
+    resolver: zodResolver(setPasswordSchema),
+    defaultValues: {
       newPassword: "",
       confirmPassword: "",
     },
@@ -130,6 +144,38 @@ export function ProfilePage() {
     }
   }
 
+  async function onCreatePasswordSubmit(values: SetPasswordValues) {
+    setIsCreatePasswordLoading(true);
+    try {
+      const response = await createPassword({
+        newPassword: values.newPassword,
+      });
+      toast.success(response.message);
+      createPasswordForm.reset();
+      const fresh = await getAccountProfile();
+      setProfile(fresh);
+      setAuthUser(fresh);
+    } catch (error) {
+      if (isApiError(error) && error.fieldErrors) {
+        Object.entries(error.fieldErrors).forEach(([field, message]) => {
+          createPasswordForm.setError(field as keyof SetPasswordValues, {
+            message,
+          });
+        });
+      } else {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to create password.";
+        toast.error(message);
+      }
+    } finally {
+      setIsCreatePasswordLoading(false);
+    }
+  }
+
+  const hasLocalPassword = profile?.provider === "local";
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div>
@@ -204,65 +250,113 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="rounded-xl border bg-card p-6 shadow-sm">
-        <h3 className="text-lg font-semibold">Change password</h3>
-        <p className="text-sm text-muted-foreground">
-          Must be at least 8 characters long.
-        </p>
-        <form
-          className="mt-4 space-y-4"
-          onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="current-password">Current password</Label>
-            <Input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              {...passwordForm.register("currentPassword")}
-              disabled={isPasswordLoading}
-            />
-            {passwordForm.formState.errors.currentPassword && (
-              <p className="text-sm text-destructive">
-                {passwordForm.formState.errors.currentPassword.message}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              {...passwordForm.register("newPassword")}
-              disabled={isPasswordLoading}
-            />
-            {passwordForm.formState.errors.newPassword && (
-              <p className="text-sm text-destructive">
-                {passwordForm.formState.errors.newPassword.message}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              {...passwordForm.register("confirmPassword")}
-              disabled={isPasswordLoading}
-            />
-            {passwordForm.formState.errors.confirmPassword && (
-              <p className="text-sm text-destructive">
-                {passwordForm.formState.errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
-          <Button type="submit" disabled={isPasswordLoading}>
-            {isPasswordLoading ? "Updating..." : "Update password"}
-          </Button>
-        </form>
-      </section>
+      {hasLocalPassword ? (
+        <section className="rounded-xl border bg-card p-6 shadow-sm">
+          <h3 className="text-lg font-semibold">Change password</h3>
+          <p className="text-sm text-muted-foreground">
+            Must be at least 8 characters long.
+          </p>
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                {...passwordForm.register("currentPassword")}
+                disabled={isPasswordLoading}
+              />
+              {passwordForm.formState.errors.currentPassword && (
+                <p className="text-sm text-destructive">
+                  {passwordForm.formState.errors.currentPassword.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                {...passwordForm.register("newPassword")}
+                disabled={isPasswordLoading}
+              />
+              {passwordForm.formState.errors.newPassword && (
+                <p className="text-sm text-destructive">
+                  {passwordForm.formState.errors.newPassword.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                {...passwordForm.register("confirmPassword")}
+                disabled={isPasswordLoading}
+              />
+              {passwordForm.formState.errors.confirmPassword && (
+                <p className="text-sm text-destructive">
+                  {passwordForm.formState.errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+            <Button type="submit" disabled={isPasswordLoading}>
+              {isPasswordLoading ? "Updating..." : "Update password"}
+            </Button>
+          </form>
+        </section>
+      ) : (
+        <section className="rounded-xl border bg-card p-6 shadow-sm">
+          <h3 className="text-lg font-semibold">Create a password</h3>
+          <p className="text-sm text-muted-foreground">
+            You currently sign in with {profile?.provider ?? "a social login"}.
+            Set a password to enable email + password sign in.
+          </p>
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={createPasswordForm.handleSubmit(onCreatePasswordSubmit)}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="create-password">New password</Label>
+              <Input
+                id="create-password"
+                type="password"
+                autoComplete="new-password"
+                {...createPasswordForm.register("newPassword")}
+                disabled={isCreatePasswordLoading}
+              />
+              {createPasswordForm.formState.errors.newPassword && (
+                <p className="text-sm text-destructive">
+                  {createPasswordForm.formState.errors.newPassword.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-confirm-password">Confirm password</Label>
+              <Input
+                id="create-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                {...createPasswordForm.register("confirmPassword")}
+                disabled={isCreatePasswordLoading}
+              />
+              {createPasswordForm.formState.errors.confirmPassword && (
+                <p className="text-sm text-destructive">
+                  {createPasswordForm.formState.errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+            <Button type="submit" disabled={isCreatePasswordLoading}>
+              {isCreatePasswordLoading ? "Saving..." : "Create password"}
+            </Button>
+          </form>
+        </section>
+      )}
     </div>
   );
 }
