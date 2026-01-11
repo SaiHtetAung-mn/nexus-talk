@@ -1,16 +1,15 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { useAppStore } from "@/store";
 import { resolveSection } from "./navigation";
 import { AppSidebar } from "../components/layouts/app-sidebar";
 import { AppRail } from "../components/layouts/app-rail";
 import { DashboardHeader } from "../components/layouts/dashboard-header";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import { logoutUser } from "@/features/auth/api/logout";
+import { cn } from "@/lib/utils";
 
 export function DashboardLayout() {
-  const { isSidebarOpen, toggleSidebar } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
@@ -35,23 +34,28 @@ export function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
-      <AppRail onToggleSidebar={toggleSidebar} />
-      <AppSidebar
-        isOpen={isSidebarOpen}
-        onToggle={toggleSidebar}
-        activeSection={activeSection}
-      />
+      <AppRail />
 
-      <main className="flex min-h-screen flex-1 flex-col">
+      <main className="flex min-h-screen flex-1 flex-col pb-16 md:pb-0">
         <DashboardHeader
           sectionLabel={activeSection?.label}
-          onToggleSidebar={toggleSidebar}
           currentUser={user}
           onLogout={handleLogout}
           onNavigateProfile={handleNavigateProfile}
         />
-        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
-          <Outlet />
+        <div className="flex flex-1 flex-col md:flex-row">
+          <AppSidebar activeSection={activeSection} variant="desktop" />
+          {!location.pathname.startsWith("/profile") && (
+            <AppSidebar activeSection={activeSection} variant="mobile" />
+          )}
+          <div
+            className={cn(
+              "flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-10",
+              !location.pathname.startsWith("/profile") && "hidden md:block",
+            )}
+          >
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>

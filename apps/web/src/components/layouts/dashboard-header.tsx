@@ -1,4 +1,3 @@
-import { Menu } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ import {
 
 type DashboardHeaderProps = {
   sectionLabel?: string;
-  onToggleSidebar: () => void;
   onLogout: () => void;
   onNavigateProfile?: () => void;
   currentUser?: UserPayload | null;
@@ -34,7 +32,6 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({
   sectionLabel,
-  onToggleSidebar,
   onLogout,
   onNavigateProfile,
   currentUser,
@@ -63,16 +60,6 @@ export function DashboardHeader({
   return (
     <header className="flex h-16 items-center border-b bg-background/80 px-4 sm:px-6">
       <div className="flex flex-1 items-center gap-3">
-        <Button
-          type="button"
-          className="md:hidden"
-          variant="outline"
-          size="icon"
-          onClick={onToggleSidebar}
-          aria-label="Toggle navigation"
-        >
-          <Menu className="h-4 w-4" />
-        </Button>
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-muted-foreground">
             Nexus Talk

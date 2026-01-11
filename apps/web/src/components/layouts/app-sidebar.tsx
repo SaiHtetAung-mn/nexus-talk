@@ -1,6 +1,4 @@
 import { Search } from "lucide-react";
-
-import { cn } from "@/lib/utils";
 import type { NavigationItem } from "@/layouts/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,9 +22,8 @@ const recentCalls = [
 ];
 
 type AppSidebarProps = {
-  isOpen: boolean;
-  onToggle: () => void;
   activeSection?: NavigationItem;
+  variant?: "desktop" | "mobile";
 };
 
 function SidebarContent({
@@ -145,51 +142,15 @@ function SidebarContent({
   return <div className="flex h-full flex-col">{renderSection()}</div>;
 }
 
-export function AppSidebar({
-  isOpen,
-  onToggle,
-  activeSection,
-}: AppSidebarProps) {
-  return (
-    <>
-      <aside className="hidden w-72 border-r md:flex">
-        <SidebarContent activeSection={activeSection} />
-      </aside>
+export function AppSidebar({ activeSection, variant = "desktop" }: AppSidebarProps) {
+  const classes =
+    variant === "mobile"
+      ? "block w-full md:hidden"
+      : "hidden w-72 border-r md:flex";
 
-      <div
-        className={cn(
-          "fixed inset-0 z-40 flex md:hidden",
-          isOpen ? "pointer-events-auto" : "pointer-events-none",
-        )}
-        aria-hidden={!isOpen}
-      >
-        <div
-          className={cn(
-            "absolute inset-0 bg-black/40 transition-opacity",
-            isOpen ? "opacity-100" : "opacity-0",
-          )}
-          onClick={onToggle}
-        />
-        <aside
-          className={cn(
-            "relative flex h-full w-72 flex-col border-r bg-background/95 backdrop-blur transition-transform duration-300",
-            isOpen ? "translate-x-0" : "-translate-x-full",
-          )}
-        >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="text-base font-semibold">Workspace</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onToggle}
-            >
-              Close
-            </Button>
-          </div>
-          <SidebarContent activeSection={activeSection} />
-        </aside>
-      </div>
-    </>
+  return (
+    <aside className={classes}>
+      <SidebarContent activeSection={activeSection} />
+    </aside>
   );
 }
