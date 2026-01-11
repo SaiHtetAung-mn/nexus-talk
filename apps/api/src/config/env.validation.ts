@@ -7,6 +7,18 @@ export const envValidationSchema = Joi.object({
   APP_NAME: Joi.string().default('Nexus Talk API'),
   APP_WEB_URL: Joi.string().uri().default('http://localhost:5173'),
   PORT: Joi.number().default(3000),
+  ALLOWED_ORIGIONS: Joi.string()
+    .custom((value, helpers) => {
+      const origins = value.split(',').map((origin) => origin.trim());
+      for (const origin of origins) {
+        try {
+          new URL(origin);
+        } catch {
+          return helpers.error('any.invalid');
+        }
+      }
+      return origins;
+    }, 'Allowed Origins Validation'),
   DATABASE_URL: Joi.string().uri().required(),
   JWT_ACCESS_SECRET: Joi.string().min(5).required(),
   JWT_REFRESH_SECRET: Joi.string().min(5).required(),
