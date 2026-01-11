@@ -1,6 +1,9 @@
+import { cn } from "@/lib/utils";
+
 type ProfileAvatarProps = {
   name?: string | null;
   email?: string | null;
+  className?: string;
 };
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -22,11 +25,16 @@ function getInitials(name?: string | null, email?: string | null) {
   return "US";
 }
 
-export function ProfileAvatar({ name, email }: ProfileAvatarProps) {
+export function ProfileAvatar({ name, email, className }: ProfileAvatarProps) {
   const initials = getInitials(name, email);
 
   return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold uppercase text-primary">
+    <div
+      className={cn(
+        "flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold uppercase text-primary",
+        className,
+      )}
+    >
       {initials}
     </div>
   );

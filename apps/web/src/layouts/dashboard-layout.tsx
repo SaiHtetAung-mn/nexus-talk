@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useAppStore } from "@/store";
 import { resolveSection } from "./navigation";
 import { AppSidebar } from "../components/layouts/app-sidebar";
+import { AppRail } from "../components/layouts/app-rail";
 import { DashboardHeader } from "../components/layouts/dashboard-header";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import { logoutUser } from "@/features/auth/api/logout";
@@ -34,9 +35,14 @@ export function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
-      <AppSidebar isOpen={isSidebarOpen} onToggle={toggleSidebar} />
+      <AppRail onToggleSidebar={toggleSidebar} />
+      <AppSidebar
+        isOpen={isSidebarOpen}
+        onToggle={toggleSidebar}
+        activeSection={activeSection}
+      />
 
-      <main className="flex flex-1 flex-col">
+      <main className="flex min-h-screen flex-1 flex-col">
         <DashboardHeader
           sectionLabel={activeSection?.label}
           onToggleSidebar={toggleSidebar}
