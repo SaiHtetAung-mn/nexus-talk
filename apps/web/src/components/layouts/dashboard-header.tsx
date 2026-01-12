@@ -42,13 +42,11 @@ export function DashboardHeader({
   const subtitle =
     currentUser?.username ? `@${currentUser.username}` : currentUser?.email ?? "";
 
-  function handleProfileSelect(event: Event) {
-    event.preventDefault();
+  function handleProfileSelect() {
     onNavigateProfile?.();
   }
 
-  function handleLogoutSelect(event: Event) {
-    event.preventDefault();
+  function handleLogoutSelect() {
     setConfirmOpen(true);
   }
 
