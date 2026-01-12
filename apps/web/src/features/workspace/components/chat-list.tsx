@@ -3,6 +3,7 @@ import { Search, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/profile-avatar";
 
 const pinnedChats = [
   {
@@ -47,7 +48,7 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
   return (
     <div className="flex h-full flex-col rounded-2xl border bg-card/80 shadow-sm">
       <div className="space-y-3 border-b px-4 py-4">
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg border border-transparent bg-muted/40 px-3 py-2 focus-within:border-border">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
@@ -63,17 +64,14 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
       <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
         <section className="space-y-3">
           <div>
-            <p className="text-sm font-semibold uppercase text-muted-foreground">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
               Pinned
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Rooms you keep close to the top.
             </p>
           </div>
           {pinnedChats.map((chat) => (
             <div
               key={chat.title}
-              className="rounded-xl border border-transparent bg-background/80 px-3 py-3 transition hover:border-border hover:bg-background"
+              className="rounded-xl border border-transparent bg-background/80 px-3 py-3 hover:border-border hover:bg-background"
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{chat.title}</h3>
@@ -90,35 +88,39 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
 
         <section className="space-y-3">
           <div>
-            <p className="text-sm font-semibold uppercase text-muted-foreground">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
               Recents
             </p>
-            <p className="text-sm text-muted-foreground">
-              Conversations you&apos;ve touched today.
-            </p>
           </div>
-          <div className="divide-y divide-border text-sm">
-          {recentChats.map((chat) => (
-            <button
-              key={chat.id}
-              type="button"
-              onClick={() => onSelectChat?.(chat.id)}
-              className={cn(
-                "flex w-full flex-col space-y-1 rounded-lg px-3 py-2 text-left transition",
-                chat.id === selectedChatId
-                  ? "bg-primary/10 text-primary"
-                  : "hover:bg-muted/40",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">{chat.name}</p>
-                <span className="text-xs text-muted-foreground">
-                  {chat.timestamp}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">{chat.snippet}</p>
-            </button>
-          ))}
+          <div className="text-sm">
+            {recentChats.map((chat) => (
+              <button
+                key={chat.id}
+                type="button"
+                onClick={() => onSelectChat?.(chat.id)}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-xl border border-transparent p-3 text-left transition hover:bg-muted/40",
+                  chat.id === selectedChatId &&
+                    "bg-primary/10 text-primary",
+                )}
+              >
+                <ProfileAvatar
+                  name={chat.name}
+                  className="h-10 w-10 text-xs"
+                />
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">{chat.name}</p>
+                    <span className="text-xs text-muted-foreground">
+                      {chat.timestamp}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {chat.snippet}
+                  </p>
+                </div>
+              </button>
+            ))}
           </div>
         </section>
       </div>

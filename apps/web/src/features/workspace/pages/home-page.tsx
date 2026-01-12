@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ChatList } from "@/features/workspace/components/chat-list";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/profile-avatar";
 
 const conversationDetails: Record<
   string,
@@ -46,7 +47,7 @@ export function HomePage() {
     <section className="grid gap-4 lg:grid-cols-[360px,1fr]">
       <div
         className={cn(
-          "h-[calc(100vh-7rem)] transition-all duration-300",
+          "h-[calc(100vh-7rem)]",
           selectedChatId ? "hidden lg:block" : "block",
         )}
       >
@@ -58,20 +59,26 @@ export function HomePage() {
 
       <div
         className={cn(
-          "flex h-[calc(100vh-7rem)] flex-col rounded-2xl border bg-card/80 shadow-sm transition-all duration-300",
+          "flex h-[calc(100vh-7rem)] flex-col rounded-2xl border bg-card/80 shadow-sm",
           !selectedChatId && "hidden lg:flex",
         )}
       >
         {activeConversation ? (
           <>
             <div className="flex items-center justify-between border-b px-4 py-3">
-              <div>
-                <p className="text-base font-semibold">
-                  {activeConversation.title}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {activeConversation.participants}
-                </p>
+              <div className="flex items-center gap-3">
+                <ProfileAvatar
+                  name={activeConversation.title}
+                  className="h-12 w-12 text-sm"
+                />
+                <div>
+                  <p className="text-base font-semibold">
+                    {activeConversation.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeConversation.participants}
+                  </p>
+                </div>
               </div>
               <Button
                 size="sm"
