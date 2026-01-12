@@ -53,7 +53,7 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
           <Input
             type="text"
             placeholder="Search chats"
-            className="h-auto border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+            className="h-auto border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
           />
         </div>
         <Button size="sm" className="w-full justify-start gap-2">
