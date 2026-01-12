@@ -12,11 +12,11 @@ export function AppRail() {
           <img
             src="./logo.png"
             alt="Nexus Talk"
-            className="h-10 w-10 rounded-full border border-border object-contain p-2 shadow"
+            className="h-12 w-12 rounded-full object-contain p-2"
           />
         </div>
 
-        <nav className="mt-6 flex-1 space-y-3">
+        <nav className="mt-12 flex-1 space-y-3">
           {navigationItems.map((item) => (
             <NavLink
               key={item.to}
