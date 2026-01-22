@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Phone, Video } from "lucide-react";
 
 import type {
   ChatListContact,
   ChatListRecent,
 } from "@/features/workspace/components/chat-list";
 
-type ConversationMessage = { from: string; body: string };
+type ConversationMessage = { id: string; from: string; body: string; createdAt: number };
 type Conversation = {
   id: string;
   title: string;
@@ -21,8 +21,13 @@ type Conversation = {
   messages: ConversationMessage[];
 };
 
-function makeMessage(from: string, body: string): ConversationMessage {
-  return { from, body };
+function makeMessage(from: string, body: string, createdAt: number = Date.now()): ConversationMessage {
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${createdAt}-${Math.random().toString(16).slice(2)}`;
+
+  return { id, from, body, createdAt };
 }
 
 function formatTime(value: string | number | Date) {
@@ -37,14 +42,16 @@ function formatTime(value: string | number | Date) {
   }
 }
 
+const now = Date.now();
+
 const initialConversations: Record<string, Conversation> = {
   alex: {
     id: "alex",
     title: "Alex Chen",
     participants: "You, Alex",
     messages: [
-      makeMessage("Alex", "I'll push the call prototype today."),
-      makeMessage("You", "Amazing! I'll prep the review deck."),
+      makeMessage("Alex", "I'll push the call prototype today.", now - 1000 * 60 * 3),
+      makeMessage("You", "Amazing! I'll prep the review deck.", now - 1000 * 60 * 2),
     ],
   },
   standup: {
@@ -52,8 +59,8 @@ const initialConversations: Record<string, Conversation> = {
     title: "Daily Standup",
     participants: "Design Squad",
     messages: [
-      makeMessage("Nadia", "Recording and summary are uploaded."),
-      makeMessage("You", "Great, adding them to the notes doc."),
+      makeMessage("Nadia", "Recording and summary are uploaded.", now - 1000 * 60 * 70),
+      makeMessage("You", "Great, adding them to the notes doc.", now - 1000 * 60 * 68),
     ],
   },
   marketing: {
@@ -61,8 +68,8 @@ const initialConversations: Record<string, Conversation> = {
     title: "Marketing Weekly",
     participants: "Marketing squad",
     messages: [
-      makeMessage("Priya", "Shared the updated messaging docs."),
-      makeMessage("You", "Reviewing now, thanks!"),
+      makeMessage("Priya", "Shared the updated messaging docs.", now - 1000 * 60 * 180),
+      makeMessage("You", "Reviewing now, thanks!", now - 1000 * 60 * 178),
     ],
   },
 };
@@ -114,32 +121,30 @@ export function HomePage() {
     return conversations[selectedChatId] ?? null;
   }, [selectedChatId, conversations]);
 
-  useEffect(() => {
-    const chatIdFromUrl = searchParams.get("chat");
+  const chatIdFromUrl = useMemo(() => searchParams.get("chat"), [searchParams]);
 
+  useEffect(() => {
     if (!chatIdFromUrl) {
       setSelectedChatId(null);
       return;
     }
 
-    const isKnownConversation = Boolean(conversations[chatIdFromUrl]);
-    const contact = contactsSeed.find((item) => item.id === chatIdFromUrl);
-
-    if (!isKnownConversation && contact) {
-      setConversations((prev) => {
-        if (prev[contact.id]) return prev;
-        const created: Conversation = {
-          id: contact.id,
-          title: contact.name,
-          participants: `You, ${contact.name.split(" ")[0] ?? contact.name}`,
-          messages: [],
-        };
-        return { ...prev, [contact.id]: created };
-      });
-    }
-
     setSelectedChatId(chatIdFromUrl);
-  }, [searchParams, conversations]);
+
+    const contact = contactsSeed.find((item) => item.id === chatIdFromUrl);
+    if (!contact) return;
+
+    setConversations((prev) => {
+      if (prev[contact.id]) return prev;
+      const created: Conversation = {
+        id: contact.id,
+        title: contact.name,
+        participants: `You, ${contact.name.split(" ")[0] ?? contact.name}`,
+        messages: [],
+      };
+      return { ...prev, [contact.id]: created };
+    });
+  }, [chatIdFromUrl]);
 
   useEffect(() => {
     if (!selectedChatId) return;
@@ -162,7 +167,7 @@ export function HomePage() {
 
   function openChat(chatId: string) {
     setSelectedChatId(chatId);
-    navigate(`/?chat=${encodeURIComponent(chatId)}`);
+    navigate(`/?chat=${encodeURIComponent(chatId)}`, { replace: true });
   }
 
   function ensureRecentAtTop(chat: ChatListRecent) {
@@ -271,6 +276,31 @@ export function HomePage() {
                   </p>
                 </div>
               </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Start audio call"
+                  onClick={() => {
+                    // TODO: wire WebRTC audio call flow
+                  }}
+                >
+                  <Phone className="h-5 w-5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Start video call"
+                  onClick={() => {
+                    // TODO: wire WebRTC video call flow
+                  }}
+                >
+                  <Video className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 text-sm">
               {activeConversation.messages.length ? (
@@ -287,7 +317,7 @@ export function HomePage() {
 
                     return (
                       <div
-                        key={`${message.from}-${index}`}
+                        key={message.id}
                         className={cn(
                           "flex items-end gap-2",
                           isSelf ? "justify-end" : "justify-start",
@@ -332,7 +362,7 @@ export function HomePage() {
                                 isSelf ? "text-right" : "text-left",
                               )}
                             >
-                              {formatTime(new Date())}
+                              {formatTime(message.createdAt)}
                               {isSelf && isLastMessage ? " · Seen" : ""}
                             </div>
                           ) : null}
