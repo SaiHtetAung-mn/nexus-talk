@@ -75,8 +75,8 @@ export function ChatList({
   }
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border bg-card/80 shadow-sm">
-      <div className="space-y-3 border-b px-4 py-4">
+    <div className="flex h-full flex-col bg-background lg:rounded-2xl lg:border lg:bg-card/80 lg:shadow-sm">
+      <div className="space-y-3 border-b px-4 py-4 lg:border-b">
         <div className="flex items-center gap-2 rounded-lg border border-transparent bg-muted/40 px-3 py-2 focus-within:border-border">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input

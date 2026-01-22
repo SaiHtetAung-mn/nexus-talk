@@ -3,8 +3,11 @@ import { NavLink } from "react-router-dom";
 import { navigationItems } from "@/layouts/navigation";
 import { cn } from "@/lib/utils";
 
-export function AppRail() {
+type AppRailProps = {
+  hideMobileNav?: boolean;
+};
 
+export function AppRail({ hideMobileNav = false }: AppRailProps) {
   return (
     <>
       <aside className="hidden w-24 flex-col border-r bg-background/90 py-4 md:flex">
@@ -36,26 +39,28 @@ export function AppRail() {
         </nav>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 px-3 py-2 shadow-sm md:hidden">
-        <div className="grid grid-cols-4 gap-1">
-          {navigationItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                cn(
-                  "flex flex-col items-center justify-center rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground",
-                  isActive && "bg-primary/10 text-primary",
-                )
-              }
-            >
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </div>
-      </nav>
+      {hideMobileNav ? null : (
+        <nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 px-3 py-2 shadow-sm md:hidden">
+          <div className="grid grid-cols-4 gap-1">
+            {navigationItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  cn(
+                    "flex flex-col items-center justify-center rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground",
+                    isActive && "bg-primary/10 text-primary",
+                  )
+                }
+              >
+                <item.icon className="h-5 w-5" />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      )}
     </>
   );
 }

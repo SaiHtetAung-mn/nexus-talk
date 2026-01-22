@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ChatList } from "@/features/workspace/components/chat-list";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,8 @@ const contactsSeed: ChatListContact[] = [
 ];
 
 export function HomePage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [recents, setRecents] = useState<ChatListRecent[]>(initialRecents);
   const [conversations, setConversations] = useState<Record<string, Conversation>>(
@@ -109,6 +112,33 @@ export function HomePage() {
   }, [selectedChatId, conversations]);
 
   useEffect(() => {
+    const chatIdFromUrl = searchParams.get("chat");
+
+    if (!chatIdFromUrl) {
+      setSelectedChatId(null);
+      return;
+    }
+
+    const isKnownConversation = Boolean(conversations[chatIdFromUrl]);
+    const contact = contactsSeed.find((item) => item.id === chatIdFromUrl);
+
+    if (!isKnownConversation && contact) {
+      setConversations((prev) => {
+        if (prev[contact.id]) return prev;
+        const created: Conversation = {
+          id: contact.id,
+          title: contact.name,
+          participants: `You, ${contact.name.split(" ")[0] ?? contact.name}`,
+          messages: [],
+        };
+        return { ...prev, [contact.id]: created };
+      });
+    }
+
+    setSelectedChatId(chatIdFromUrl);
+  }, [searchParams, conversations]);
+
+  useEffect(() => {
     if (!selectedChatId) return;
     const id = setTimeout(() => {
       composerInputRef.current?.focus();
@@ -122,7 +152,15 @@ export function HomePage() {
     messageListEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [selectedChatId, activeConversation?.messages.length]);
 
-  const handleBack = () => setSelectedChatId(null);
+  const handleBack = () => {
+    setSelectedChatId(null);
+    navigate("/", { replace: true });
+  };
+
+  function openChat(chatId: string) {
+    setSelectedChatId(chatId);
+    navigate(`/?chat=${encodeURIComponent(chatId)}`);
+  }
 
   function ensureRecentAtTop(chat: ChatListRecent) {
     setRecents((prev) => {
@@ -150,7 +188,7 @@ export function HomePage() {
       timestamp: "now",
     });
 
-    setSelectedChatId(contact.id);
+    openChat(contact.id);
   }
 
   function handleSendMessage() {
@@ -179,7 +217,7 @@ export function HomePage() {
   }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[360px,1fr]">
+    <section className="-mx-4 -my-4 grid gap-0 bg-background lg:mx-0 lg:my-0 lg:grid-cols-[360px,1fr] lg:gap-4 lg:bg-transparent">
       <div
         className={cn(
           "h-[calc(100vh-7rem)]",
@@ -187,7 +225,7 @@ export function HomePage() {
         )}
       >
         <ChatList
-          onSelectChat={(id) => setSelectedChatId(id)}
+          onSelectChat={(id) => openChat(id)}
           selectedChatId={selectedChatId}
           recents={recents}
           contacts={contactsSeed}
@@ -197,13 +235,15 @@ export function HomePage() {
 
       <div
         className={cn(
-          "flex h-[calc(100vh-7rem)] flex-col rounded-2xl border bg-card/80 shadow-sm",
+          "flex flex-col bg-background lg:h-[calc(100vh-7rem)] lg:rounded-2xl lg:border lg:bg-card/80 lg:shadow-sm",
           !selectedChatId && "hidden lg:flex",
+          selectedChatId &&
+            "fixed inset-0 z-40 h-[100dvh] lg:static lg:inset-auto lg:z-auto",
         )}
       >
         {activeConversation ? (
           <>
-            <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
               <div className="flex items-center gap-3">
                 <ProfileAvatar
                   name={activeConversation.title}
@@ -312,7 +352,7 @@ export function HomePage() {
                 </div>
               )}
             </div>
-            <div className="border-t px-4 py-3">
+            <div className="sticky bottom-0 z-10 border-t bg-background/95 px-4 py-3 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
               <div className="flex items-center gap-2">
                 <Input
                   ref={composerInputRef}

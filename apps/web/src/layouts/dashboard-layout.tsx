@@ -30,17 +30,38 @@ export function DashboardLayout() {
     navigate("/profile");
   }
 
+  const chatId = new URLSearchParams(location.search).get("chat");
+  const isChatFullscreen = location.pathname === "/" && Boolean(chatId);
+
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
-      <AppRail />
+      <AppRail hideMobileNav={isChatFullscreen} />
 
-      <main className="flex min-h-screen flex-1 flex-col pb-16 md:pb-0">
-        <DashboardHeader
-          sectionLabel={activeSection?.label}
-          currentUser={user}
-          onLogout={handleLogout}
-          onNavigateProfile={handleNavigateProfile}
-        />
+      <main
+        className={
+          isChatFullscreen
+            ? "flex min-h-screen flex-1 flex-col pb-0"
+            : "flex min-h-screen flex-1 flex-col pb-16 md:pb-0"
+        }
+      >
+        {isChatFullscreen ? (
+          <div className="hidden md:block">
+            <DashboardHeader
+              sectionLabel={activeSection?.label}
+              currentUser={user}
+              onLogout={handleLogout}
+              onNavigateProfile={handleNavigateProfile}
+            />
+          </div>
+        ) : (
+          <DashboardHeader
+            sectionLabel={activeSection?.label}
+            currentUser={user}
+            onLogout={handleLogout}
+            onNavigateProfile={handleNavigateProfile}
+          />
+        )}
+
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-4 sm:py-4">
           <Outlet />
         </div>
