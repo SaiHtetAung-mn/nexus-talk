@@ -1,4 +1,5 @@
-import { Search, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, Plus, X } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,33 +19,61 @@ const pinnedChats = [
   },
 ];
 
-const recentChats = [
-  {
-    id: "alex",
-    name: "Alex Chen",
-    snippet: "I'll push the call prototype today.",
-    timestamp: "2m ago",
-  },
-  {
-    id: "standup",
-    name: "Daily Standup",
-    snippet: "Recording and summary are ready.",
-    timestamp: "1h ago",
-  },
-  {
-    id: "marketing",
-    name: "Marketing Weekly",
-    snippet: "Shared the updated messaging docs.",
-    timestamp: "3h ago",
-  },
-];
+export type ChatListRecent = {
+  id: string;
+  name: string;
+  snippet?: string;
+  timestamp?: string;
+};
+
+export type ChatListContact = {
+  id: string;
+  name: string;
+  subtitle?: string;
+};
 
 export type ChatListProps = {
   onSelectChat?: (chatId: string) => void;
   selectedChatId?: string | null;
+  recents: ChatListRecent[];
+  contacts: ChatListContact[];
+  onStartChat?: (contact: ChatListContact) => void;
 };
 
-export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
+export function ChatList({
+  onSelectChat,
+  selectedChatId,
+  recents,
+  contacts,
+  onStartChat,
+}: ChatListProps) {
+  const [isStartingChat, setIsStartingChat] = useState(false);
+  const [contactQuery, setContactQuery] = useState("");
+  const contactInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isStartingChat) return;
+    const id = setTimeout(() => contactInputRef.current?.focus(), 50);
+    return () => clearTimeout(id);
+  }, [isStartingChat]);
+
+  const filteredContacts = useMemo(() => {
+    const normalized = contactQuery.trim().toLowerCase();
+    if (!normalized) return contacts;
+    return contacts.filter((contact) => {
+      return (
+        contact.name.toLowerCase().includes(normalized) ||
+        (contact.subtitle?.toLowerCase().includes(normalized) ?? false)
+      );
+    });
+  }, [contactQuery, contacts]);
+
+  function handleStartChat(contact: ChatListContact) {
+    onStartChat?.(contact);
+    setIsStartingChat(false);
+    setContactQuery("");
+  }
+
   return (
     <div className="flex h-full flex-col rounded-2xl border bg-card/80 shadow-sm">
       <div className="space-y-3 border-b px-4 py-4">
@@ -56,10 +85,69 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
             className="h-auto border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
           />
         </div>
-        <Button size="sm" className="w-full justify-start gap-2">
-          <Plus className="h-4 w-4" />
-          Start a chat
-        </Button>
+
+        {isStartingChat ? (
+          <div className="space-y-2 rounded-xl border bg-background/70 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                New chat
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2"
+                onClick={() => {
+                  setIsStartingChat(false);
+                  setContactQuery("");
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <Input
+              ref={contactInputRef}
+              value={contactQuery}
+              onChange={(event) => setContactQuery(event.target.value)}
+              placeholder="Search contacts"
+              className="h-9"
+            />
+            <div className="max-h-48 space-y-1 overflow-y-auto">
+              {filteredContacts.length ? (
+                filteredContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => handleStartChat(contact)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left hover:bg-muted/60"
+                  >
+                    <ProfileAvatar name={contact.name} className="h-8 w-8 text-[10px]" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{contact.name}</p>
+                      {contact.subtitle ? (
+                        <p className="text-xs text-muted-foreground">
+                          {contact.subtitle}
+                        </p>
+                      ) : null}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="px-2 py-3 text-xs text-muted-foreground">
+                  No contacts match "{contactQuery.trim()}".
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            className="w-full justify-start gap-2"
+            onClick={() => setIsStartingChat(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Start a chat
+          </Button>
+        )}
       </div>
       <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
         <section className="space-y-3">
@@ -93,15 +181,15 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
             </p>
           </div>
           <div className="text-sm">
-            {recentChats.map((chat) => (
+            {recents.map((chat) => (
               <button
                 key={chat.id}
                 type="button"
                 onClick={() => onSelectChat?.(chat.id)}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-xl border border-transparent p-3 text-left transition hover:bg-muted/40",
-                  chat.id === selectedChatId &&
-                    "bg-primary/10 text-primary",
+                  "flex w-full items-start gap-3 rounded-xl border border-transparent p-3 text-left transition",
+                  chat.id === selectedChatId && "bg-primary/10 text-primary",
+                  chat.id !== selectedChatId && "hover:bg-muted/60"
                 )}
               >
                 <ProfileAvatar
@@ -112,12 +200,14 @@ export function ChatList({ onSelectChat, selectedChatId }: ChatListProps) {
                   <div className="flex items-center justify-between">
                     <p className="font-semibold">{chat.name}</p>
                     <span className="text-xs text-muted-foreground">
-                      {chat.timestamp}
+                      {chat.timestamp ?? ""}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {chat.snippet}
-                  </p>
+                  {chat.snippet ? (
+                    <p className="text-xs text-muted-foreground">
+                      {chat.snippet}
+                    </p>
+                  ) : null}
                 </div>
               </button>
             ))}

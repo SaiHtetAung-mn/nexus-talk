@@ -53,6 +53,8 @@ export function VerifyEmailPage() {
       return;
     }
 
+    const tokenValue = token;
+
     let active = true;
 
     async function verify() {
@@ -61,7 +63,7 @@ export function VerifyEmailPage() {
       setVerificationError(null);
 
       try {
-        const res = await verifyEmailToken(token);
+        const res = await verifyEmailToken(tokenValue);
         if (!active) return;
         setVerificationState("success");
         setVerificationMessage(res.message);
