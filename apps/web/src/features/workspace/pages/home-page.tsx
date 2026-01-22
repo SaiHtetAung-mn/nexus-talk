@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/profile-avatar";
+import { ChevronLeft } from "lucide-react";
 
 import type {
   ChatListContact,
@@ -97,7 +98,9 @@ const contactsSeed: ChatListContact[] = [
 export function HomePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(() => {
+    return searchParams.get("chat");
+  });
   const [recents, setRecents] = useState<ChatListRecent[]>(initialRecents);
   const [conversations, setConversations] = useState<Record<string, Conversation>>(
     initialConversations,
@@ -245,6 +248,16 @@ export function HomePage() {
           <>
             <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
               <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="-ml-2 lg:hidden"
+                  onClick={handleBack}
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
                 <ProfileAvatar
                   name={activeConversation.title}
                   className="h-12 w-12 text-sm"
@@ -258,14 +271,6 @@ export function HomePage() {
                   </p>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="lg:hidden"
-                onClick={handleBack}
-              >
-                Back
-              </Button>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 text-sm">
               {activeConversation.messages.length ? (
