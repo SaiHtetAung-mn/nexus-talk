@@ -59,6 +59,11 @@ export function AuthLayout() {
 
       <section className="flex flex-1 justify-center items-center overflow-y-auto px-6 py-10">
         <div className="w-full max-w-md space-y-8">
+          <div className="flex justify-center lg:hidden">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+              Nexus Talk
+            </div>
+          </div>
           <Outlet />
         </div>
       </section>
