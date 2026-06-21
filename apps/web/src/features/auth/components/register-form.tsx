@@ -78,9 +78,6 @@ export function RegisterForm() {
         <div className="space-y-3">
           <div>
             <Label htmlFor="reg-email">Email</Label>
-            <p className="text-xs text-muted-foreground">
-              We&apos;ll use this to send magic links and alerts.
-            </p>
           </div>
           <Input
             id="reg-email"

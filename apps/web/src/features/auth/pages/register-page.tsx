@@ -4,7 +4,7 @@ import { OAuthButtons } from "../components/oauth-buttons";
 export function RegisterPage() {
   return (
     <div className="space-y-6">
-      <div className="space-y-1 text-center">
+      <div className="space-y-1 text-center hidden sm:block">
         <h1 className="text-2xl font-semibold text-foreground">
           Sign Up
         </h1>
