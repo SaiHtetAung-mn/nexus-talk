@@ -104,6 +104,56 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
+  async discoverUsers(
+    currentUserId: string,
+    query?: string,
+  ): Promise<UserResponseDto[]> {
+    const normalizedQuery = query?.trim().toLowerCase();
+    const currentObjectId = ObjectId.isValid(currentUserId)
+      ? new ObjectId(currentUserId)
+      : null;
+
+    const matchStage: Record<string, unknown> = {};
+
+    if (currentObjectId) {
+      matchStage._id = { $ne: currentObjectId };
+    }
+
+    if (normalizedQuery) {
+      const regex = new RegExp(normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      matchStage.$or = [
+        { name: regex },
+        { username: regex },
+        { email: regex },
+      ];
+    }
+
+    const users = (await this.userRepository
+      .aggregate([
+        { $match: matchStage },
+        { $sort: { name: 1, username: 1 } },
+        { $limit: 20 },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1,
+            username: 1,
+            provider: 1,
+            provider_id: 1,
+            is_email_verified: 1,
+            created_at: 1,
+            updated_at: 1,
+          },
+        },
+      ])
+      .toArray()) as User[];
+
+    return users
+      .map((user) => this.toResponse(user))
+      .filter((user): user is UserResponseDto => Boolean(user));
+  }
+
   toResponse(user: User | null): UserResponseDto | null {
     if (!user) {
       return null;

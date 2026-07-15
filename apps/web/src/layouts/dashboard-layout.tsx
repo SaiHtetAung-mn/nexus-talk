@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -6,6 +7,8 @@ import { AppRail } from "../components/layouts/app-rail";
 import { DashboardHeader } from "../components/layouts/dashboard-header";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import { logoutUser } from "@/features/auth/api/logout";
+import { disconnectRealtimeSocket, getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
+import type { CallSession } from "@/features/workspace/api/types";
 
 export function DashboardLayout() {
   const location = useLocation();
@@ -14,12 +17,33 @@ export function DashboardLayout() {
   const clearUser = useAuthStore((state) => state.clearUser);
   const activeSection = resolveSection(location.pathname);
 
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleCallInvite(call: CallSession) {
+      const caller = call.participants[0]?.name ?? "Someone";
+      toast.message(`${caller} started a video call`, {
+        action: {
+          label: "Open",
+          onClick: () => navigate(`/calls?call=${encodeURIComponent(call._id)}`),
+        },
+      });
+    }
+
+    socket.on("call.invite.created", handleCallInvite);
+
+    return () => {
+      socket.off("call.invite.created", handleCallInvite);
+    };
+  }, [navigate]);
+
   async function handleLogout() {
     try {
       await logoutUser();
     } catch {
       // ignore error; we'll still clear local state
     } finally {
+      disconnectRealtimeSocket();
       clearUser();
       toast.success("Signed out");
       navigate("/auth", { replace: true });

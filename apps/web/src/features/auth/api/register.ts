@@ -1,16 +1,17 @@
 import { http } from "@/lib/http";
+import { unwrapMessageResponse } from "@/lib/api-response";
 import type { RegisterValues } from "@/features/auth/schemas/register-schema";
 import type { MessageResponse } from "@/features/auth/api/types";
 
 export async function registerUser(
   payload: RegisterValues,
 ): Promise<MessageResponse> {
-  const response = await http.post<MessageResponse>("/auth/register", {
+  const response = await http.post("/auth/register", {
     name: payload.displayName,
     email: payload.email,
     username: payload.handle,
     password: payload.password,
   });
 
-  return response.data;
+  return unwrapMessageResponse(response);
 }

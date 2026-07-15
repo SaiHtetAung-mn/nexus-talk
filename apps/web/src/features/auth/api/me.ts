@@ -1,11 +1,8 @@
 import { http } from "@/lib/http";
+import { unwrapApiResponse } from "@/lib/api-response";
 import type { UserPayload } from "@/features/auth/api/types";
 
-type CurrentUserResponse = {
-  user: UserPayload;
-};
-
 export async function getCurrentUser(): Promise<UserPayload> {
-  const response = await http.get<CurrentUserResponse>("/auth/me");
-  return response.data.user;
+  const response = await http.get("/auth/me");
+  return unwrapApiResponse<UserPayload>(response);
 }

@@ -15,6 +15,9 @@ import mailConfig from './config/mail.config';
 import { RealtimeModule } from './features/realtime/realtime.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ApiResponseInterceptor } from './core/interceptors/api-response.interceptor';
+import { ConversationModule } from './features/conversation/conversation.module';
+import { MessageModule } from './features/message/message.module';
+import { CallModule } from './features/call/call.module';
 
 @Module({
   imports: [
@@ -48,6 +51,9 @@ import { ApiResponseInterceptor } from './core/interceptors/api-response.interce
     AccountModule,
     AuthModule,
     RealtimeModule,
+    ConversationModule,
+    MessageModule,
+    CallModule,
   ],
   providers: [
     {

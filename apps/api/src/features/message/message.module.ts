@@ -1,0 +1,21 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { Message } from '@/database/entities/Message';
+import { ConversationModule } from '@/features/conversation/conversation.module';
+import { RealtimeModule } from '@/features/realtime/realtime.module';
+import { MessageController } from './message.controller';
+import { MessageRepository } from './message.repository';
+import { MessageService } from './message.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Message]),
+    ConversationModule,
+    RealtimeModule,
+  ],
+  controllers: [MessageController],
+  providers: [MessageRepository, MessageService],
+  exports: [MessageService],
+})
+export class MessageModule {}

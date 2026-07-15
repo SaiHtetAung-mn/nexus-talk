@@ -31,6 +31,13 @@ type TypingPayload = {
   conversationId: string;
 };
 
+type CallSignalPayload = {
+  callId: string;
+  targetUserId: string;
+  description?: Record<string, unknown>;
+  candidate?: Record<string, unknown>;
+};
+
 @WebSocketGateway({
   cors: {
     origin: true,
@@ -156,5 +163,60 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
         userId: user?._id ?? null,
       },
     );
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('call.signal.offer')
+  handleOffer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: CallSignalPayload,
+  ) {
+    this.emitCallSignal(client, 'call.signal.offer', payload);
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('call.signal.answer')
+  handleAnswer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: CallSignalPayload,
+  ) {
+    this.emitCallSignal(client, 'call.signal.answer', payload);
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('call.signal.ice-candidate')
+  handleIceCandidate(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: CallSignalPayload,
+  ) {
+    this.emitCallSignal(client, 'call.signal.ice-candidate', payload);
+  }
+
+  private emitCallSignal(
+    client: AuthenticatedSocket,
+    event:
+      | 'call.signal.offer'
+      | 'call.signal.answer'
+      | 'call.signal.ice-candidate',
+    payload: CallSignalPayload,
+  ) {
+    const callId = payload?.callId?.trim();
+    const targetUserId = payload?.targetUserId?.trim();
+    const sender = client.data.user;
+
+    if (!callId) {
+      throw new BadRequestException('callId is required');
+    }
+
+    if (!targetUserId) {
+      throw new BadRequestException('targetUserId is required');
+    }
+
+    this.realtimeService.emitToUser(targetUserId, event as any, {
+      callId,
+      fromUserId: sender?._id ?? null,
+      description: payload.description ?? null,
+      candidate: payload.candidate ?? null,
+    });
   }
 }

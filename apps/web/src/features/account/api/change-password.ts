@@ -1,4 +1,5 @@
 import { http } from "@/lib/http";
+import { unwrapMessageResponse } from "@/lib/api-response";
 
 export type ChangePasswordPayload = {
   currentPassword: string;
@@ -12,10 +13,10 @@ type ChangePasswordResponse = {
 export async function changePassword(
   payload: ChangePasswordPayload,
 ): Promise<ChangePasswordResponse> {
-  const response = await http.patch<ChangePasswordResponse>(
+  const response = await http.patch(
     "/account/password",
     payload,
   );
 
-  return response.data;
+  return unwrapMessageResponse(response);
 }

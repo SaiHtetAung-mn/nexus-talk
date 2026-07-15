@@ -1,227 +1,300 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronLeft, Phone, Video } from "lucide-react";
+import { toast } from "sonner";
 
-import { ChatList } from "@/features/workspace/components/chat-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { ChatList } from "@/features/workspace/components/chat-list";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { ChevronLeft, Phone, Video } from "lucide-react";
-
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/features/auth/store/auth-store";
+import type { UserPayload } from "@/features/auth/api/types";
+import { createDirectConversation } from "@/features/workspace/api/create-direct-conversation";
+import { discoverUsers } from "@/features/workspace/api/discover-users";
+import { listConversations } from "@/features/workspace/api/list-conversations";
+import { listMessages } from "@/features/workspace/api/list-messages";
+import { sendMessage } from "@/features/workspace/api/send-message";
+import { startVideoCall } from "@/features/workspace/api/start-video-call";
 import type {
-  ChatListContact,
-  ChatListRecent,
-} from "@/features/workspace/components/chat-list";
+  ConversationPreview,
+  WorkspaceMessage,
+} from "@/features/workspace/api/types";
+import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 
-type ConversationMessage = { id: string; from: string; body: string; createdAt: number };
-type Conversation = {
-  id: string;
-  title: string;
-  participants: string;
-  messages: ConversationMessage[];
-};
+function formatTime(value: string | null) {
+  if (!value) {
+    return "";
+  }
 
-function makeMessage(from: string, body: string, createdAt: number = Date.now()): ConversationMessage {
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${createdAt}-${Math.random().toString(16).slice(2)}`;
-
-  return { id, from, body, createdAt };
-}
-
-function formatTime(value: string | number | Date) {
   try {
-    const date = value instanceof Date ? value : new Date(value);
     return new Intl.DateTimeFormat(undefined, {
       hour: "numeric",
       minute: "2-digit",
-    }).format(date);
+    }).format(new Date(value));
   } catch {
     return "";
   }
 }
 
-const now = Date.now();
+function getSenderLabel(
+  message: WorkspaceMessage,
+  currentUser: UserPayload | null,
+  conversation: ConversationPreview | null,
+) {
+  if (message.senderId === currentUser?._id) {
+    return "You";
+  }
 
-const initialConversations: Record<string, Conversation> = {
-  alex: {
-    id: "alex",
-    title: "Alex Chen",
-    participants: "You, Alex",
-    messages: [
-      makeMessage("Alex", "I'll push the call prototype today.", now - 1000 * 60 * 3),
-      makeMessage("You", "Amazing! I'll prep the review deck.", now - 1000 * 60 * 2),
-    ],
-  },
-  standup: {
-    id: "standup",
-    title: "Daily Standup",
-    participants: "Design Squad",
-    messages: [
-      makeMessage("Nadia", "Recording and summary are uploaded.", now - 1000 * 60 * 70),
-      makeMessage("You", "Great, adding them to the notes doc.", now - 1000 * 60 * 68),
-    ],
-  },
-  marketing: {
-    id: "marketing",
-    title: "Marketing Weekly",
-    participants: "Marketing squad",
-    messages: [
-      makeMessage("Priya", "Shared the updated messaging docs.", now - 1000 * 60 * 180),
-      makeMessage("You", "Reviewing now, thanks!", now - 1000 * 60 * 178),
-    ],
-  },
-};
+  const sender = conversation?.members.find(
+    (member) => member._id === message.senderId,
+  );
 
-const initialRecents: ChatListRecent[] = [
-  {
-    id: "alex",
-    name: "Alex Chen",
-    snippet: "I'll push the call prototype today.",
-    timestamp: "2m ago",
-  },
-  {
-    id: "standup",
-    name: "Daily Standup",
-    snippet: "Recording and summary are ready.",
-    timestamp: "1h ago",
-  },
-  {
-    id: "marketing",
-    name: "Marketing Weekly",
-    snippet: "Shared the updated messaging docs.",
-    timestamp: "3h ago",
-  },
-];
+  return sender?.name ?? "Someone";
+}
 
-const contactsSeed: ChatListContact[] = [
-  { id: "alex", name: "Alex Chen", subtitle: "Designer" },
-  { id: "nadia", name: "Nadia Patel", subtitle: "Ops" },
-  { id: "priya", name: "Priya Singh", subtitle: "Marketing" },
-  { id: "sam", name: "Sam Rivera", subtitle: "Engineering" },
-];
+function upsertMessage(
+  previous: Record<string, WorkspaceMessage[]>,
+  message: WorkspaceMessage,
+) {
+  const currentMessages = previous[message.conversationId] ?? [];
+  if (currentMessages.some((entry) => entry._id === message._id)) {
+    return previous;
+  }
+
+  return {
+    ...previous,
+    [message.conversationId]: [...currentMessages, message].sort(
+      (left, right) => left.sequence - right.sequence,
+    ),
+  };
+}
 
 export function HomePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(() => {
-    return searchParams.get("chat");
-  });
-  const [recents, setRecents] = useState<ChatListRecent[]>(initialRecents);
-  const [conversations, setConversations] = useState<Record<string, Conversation>>(
-    initialConversations,
-  );
+  const currentUser = useAuthStore((state) => state.user);
+  const selectedConversationId = searchParams.get("chat");
+  const [conversations, setConversations] = useState<ConversationPreview[]>([]);
+  const [contacts, setContacts] = useState<UserPayload[]>([]);
+  const [messagesByConversation, setMessagesByConversation] = useState<
+    Record<string, WorkspaceMessage[]>
+  >({});
   const [draftMessage, setDraftMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const messageListEndRef = useRef<HTMLDivElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeConversation = useMemo(() => {
-    if (!selectedChatId) return null;
-    return conversations[selectedChatId] ?? null;
-  }, [selectedChatId, conversations]);
+    if (!selectedConversationId) {
+      return null;
+    }
 
-  const chatIdFromUrl = useMemo(() => searchParams.get("chat"), [searchParams]);
+    return (
+      conversations.find((conversation) => conversation._id === selectedConversationId) ??
+      null
+    );
+  }, [conversations, selectedConversationId]);
+
+  const activeMessages = selectedConversationId
+    ? messagesByConversation[selectedConversationId] ?? []
+    : [];
 
   useEffect(() => {
-    if (!chatIdFromUrl) {
-      setSelectedChatId(null);
+    let active = true;
+
+    async function loadWorkspace() {
+      try {
+        const [conversationItems, contactItems] = await Promise.all([
+          listConversations(),
+          discoverUsers(""),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setConversations(conversationItems);
+        setContacts(contactItems);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load workspace right now.";
+        toast.error(message);
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadWorkspace();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
       return;
     }
 
-    setSelectedChatId(chatIdFromUrl);
+    const conversationId = selectedConversationId;
 
-    const contact = contactsSeed.find((item) => item.id === chatIdFromUrl);
-    if (!contact) return;
+    if (messagesByConversation[conversationId]) {
+      return;
+    }
 
-    setConversations((prev) => {
-      if (prev[contact.id]) return prev;
-      const created: Conversation = {
-        id: contact.id,
-        title: contact.name,
-        participants: `You, ${contact.name.split(" ")[0] ?? contact.name}`,
-        messages: [],
-      };
-      return { ...prev, [contact.id]: created };
-    });
-  }, [chatIdFromUrl]);
+    let active = true;
+
+    async function loadConversationMessages() {
+      try {
+        const items = await listMessages(conversationId);
+        if (!active) {
+          return;
+        }
+
+        setMessagesByConversation((previous) => ({
+          ...previous,
+          [conversationId]: items,
+        }));
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load messages.";
+        toast.error(message);
+      }
+    }
+
+    void loadConversationMessages();
+
+    return () => {
+      active = false;
+    };
+  }, [messagesByConversation, selectedConversationId]);
 
   useEffect(() => {
-    if (!selectedChatId) return;
-    const id = setTimeout(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    const conversationId = selectedConversationId;
+    const socket = getRealtimeSocket();
+    socket.emit("chat.conversation.join", {
+      conversationId,
+    });
+
+    function handleMessageCreated(message: WorkspaceMessage) {
+      setMessagesByConversation((previous) => upsertMessage(previous, message));
+    }
+
+    async function handleConversationUpdated(payload: { conversationId: string }) {
+      if (!payload.conversationId) {
+        return;
+      }
+
+      try {
+        const items = await listConversations();
+        setConversations(items);
+      } catch {
+        // keep current view if refresh fails
+      }
+    }
+
+    socket.on("chat.message.created", handleMessageCreated);
+    socket.on("chat.conversation.updated", handleConversationUpdated);
+
+    return () => {
+      socket.off("chat.message.created", handleMessageCreated);
+      socket.off("chat.conversation.updated", handleConversationUpdated);
+    };
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
       composerInputRef.current?.focus();
       messageListEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 50);
-    return () => clearTimeout(id);
-  }, [selectedChatId]);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedConversationId]);
 
   useEffect(() => {
-    if (!selectedChatId) return;
     messageListEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selectedChatId, activeConversation?.messages.length]);
+  }, [activeMessages.length]);
 
-  const handleBack = () => {
-    setSelectedChatId(null);
+  function handleBack() {
     navigate("/", { replace: true });
-  };
-
-  function openChat(chatId: string) {
-    setSelectedChatId(chatId);
-    navigate(`/?chat=${encodeURIComponent(chatId)}`, { replace: true });
   }
 
-  function ensureRecentAtTop(chat: ChatListRecent) {
-    setRecents((prev) => {
-      const without = prev.filter((item) => item.id !== chat.id);
-      return [chat, ...without];
-    });
+  function openConversation(conversationId: string) {
+    navigate(`/?chat=${encodeURIComponent(conversationId)}`, { replace: true });
   }
 
-  function handleStartChat(contact: ChatListContact) {
-    setConversations((prev) => {
-      if (prev[contact.id]) return prev;
-      const created: Conversation = {
-        id: contact.id,
-        title: contact.name,
-        participants: `You, ${contact.name.split(" ")[0] ?? contact.name}`,
-        messages: [],
-      };
-      return { ...prev, [contact.id]: created };
-    });
+  async function handleStartChat(contact: UserPayload) {
+    try {
+      const conversation = await createDirectConversation(contact._id);
+      setConversations((previous) => {
+        const exists = previous.some((item) => item._id === conversation._id);
+        if (exists) {
+          return previous.map((item) =>
+            item._id === conversation._id ? conversation : item,
+          );
+        }
 
-    ensureRecentAtTop({
-      id: contact.id,
-      name: contact.name,
-      snippet: "Say hello 👋",
-      timestamp: "now",
-    });
-
-    openChat(contact.id);
+        return [conversation, ...previous];
+      });
+      openConversation(conversation._id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to start chat.";
+      toast.error(message);
+    }
   }
 
-  function handleSendMessage() {
-    if (!selectedChatId) return;
-    const body = draftMessage.trim();
-    if (!body) return;
+  async function handleSendMessage() {
+    if (!selectedConversationId || !draftMessage.trim()) {
+      return;
+    }
 
-    setConversations((prev) => {
-      const current = prev[selectedChatId];
-      if (!current) return prev;
-      const next: Conversation = {
-        ...current,
-        messages: [...current.messages, makeMessage("You", body)],
-      };
-      return { ...prev, [selectedChatId]: next };
-    });
+    setIsSending(true);
+    try {
+      const message = await sendMessage(selectedConversationId, draftMessage);
+      setMessagesByConversation((previous) => upsertMessage(previous, message));
+      setDraftMessage("");
+      const items = await listConversations();
+      setConversations(items);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to send message.";
+      toast.error(message);
+    } finally {
+      setIsSending(false);
+    }
+  }
 
-    ensureRecentAtTop({
-      id: selectedChatId,
-      name: activeConversation?.title ?? "Conversation",
-      snippet: body,
-      timestamp: "now",
-    });
+  async function handleStartVideoCall() {
+    if (!selectedConversationId) {
+      return;
+    }
 
-    setDraftMessage("");
+    try {
+      const call = await startVideoCall(selectedConversationId);
+      toast.success("Video call started");
+      navigate(`/calls?call=${encodeURIComponent(call._id)}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to start video call.";
+      toast.error(message);
+    }
   }
 
   return (
@@ -229,14 +302,14 @@ export function HomePage() {
       <div
         className={cn(
           "h-[calc(100vh-7rem)]",
-          selectedChatId ? "hidden lg:block" : "block",
+          selectedConversationId ? "hidden lg:block" : "block",
         )}
       >
         <ChatList
-          onSelectChat={(id) => openChat(id)}
-          selectedChatId={selectedChatId}
-          recents={recents}
-          contacts={contactsSeed}
+          conversations={conversations}
+          contacts={contacts}
+          selectedConversationId={selectedConversationId}
+          onSelectConversation={openConversation}
           onStartChat={handleStartChat}
         />
       </div>
@@ -244,8 +317,8 @@ export function HomePage() {
       <div
         className={cn(
           "flex flex-col bg-background lg:h-[calc(100vh-7rem)] lg:rounded-2xl lg:border lg:bg-card/80 lg:shadow-sm",
-          !selectedChatId && "hidden lg:flex",
-          selectedChatId &&
+          !selectedConversationId && "hidden lg:flex",
+          selectedConversationId &&
             "fixed inset-0 z-40 h-[100dvh] lg:static lg:inset-auto lg:z-auto",
         )}
       >
@@ -272,7 +345,9 @@ export function HomePage() {
                     {activeConversation.title}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {activeConversation.participants}
+                    {activeConversation.subtitle
+                      ? `@${activeConversation.subtitle}`
+                      : "Conversation"}
                   </p>
                 </div>
               </div>
@@ -283,9 +358,6 @@ export function HomePage() {
                   size="icon"
                   variant="ghost"
                   aria-label="Start audio call"
-                  onClick={() => {
-                    // TODO: wire WebRTC audio call flow
-                  }}
                 >
                   <Phone className="h-5 w-5" />
                 </Button>
@@ -294,120 +366,117 @@ export function HomePage() {
                   size="icon"
                   variant="ghost"
                   aria-label="Start video call"
-                  onClick={() => {
-                    // TODO: wire WebRTC video call flow
-                  }}
+                  onClick={handleStartVideoCall}
                 >
                   <Video className="h-5 w-5" />
                 </Button>
               </div>
             </div>
+
             <div className="flex-1 overflow-y-auto px-4 py-4 text-sm">
-              {activeConversation.messages.length ? (
+              {activeMessages.length ? (
                 <div className="flex flex-col gap-3">
-                  {activeConversation.messages.map((message, index) => {
-                    const isSelf = message.from === "You";
-                    const previous = activeConversation.messages[index - 1];
-                    const next = activeConversation.messages[index + 1];
-                    const isFirstInGroup = previous?.from !== message.from;
-                    const isLastInGroup = next?.from !== message.from;
-                    const showAvatar = isFirstInGroup;
-                    const avatarName = isSelf ? "You" : message.from;
-                    const isLastMessage = index === activeConversation.messages.length - 1;
+                  {activeMessages.map((message, index) => {
+                    const senderLabel = getSenderLabel(
+                      message,
+                      currentUser,
+                      activeConversation,
+                    );
+                    const isSelf = message.senderId === currentUser?._id;
+                    const previous = activeMessages[index - 1];
+                    const next = activeMessages[index + 1];
+                    const isFirstInGroup = previous?.senderId !== message.senderId;
+                    const isLastInGroup = next?.senderId !== message.senderId;
 
                     return (
                       <div
-                        key={message.id}
+                        key={message._id}
                         className={cn(
-                          "flex items-end gap-2",
+                          "flex gap-2",
                           isSelf ? "justify-end" : "justify-start",
                         )}
                       >
-                        {!isSelf ? (
-                          <div className={cn("w-9", !showAvatar && "invisible")}>
-                            <ProfileAvatar
-                              name={avatarName}
-                              className="h-9 w-9 text-[10px]"
-                            />
-                          </div>
+                        {!isSelf && isFirstInGroup ? (
+                          <ProfileAvatar
+                            name={senderLabel}
+                            className="mt-auto h-8 w-8 text-[10px]"
+                          />
+                        ) : !isSelf ? (
+                          <div className="w-8 shrink-0" />
                         ) : null}
 
-                        <div className={cn("max-w-[78%]", isSelf ? "items-end" : "items-start")}>
-                          {!isSelf && isFirstInGroup ? (
-                            <p className="mb-1 pl-1 text-[11px] font-semibold text-muted-foreground">
-                              {message.from}
+                        <div
+                          className={cn(
+                            "max-w-[78%] space-y-1",
+                            isSelf && "items-end text-right",
+                          )}
+                        >
+                          {isFirstInGroup ? (
+                            <p className="px-1 text-xs text-muted-foreground">
+                              {senderLabel}
                             </p>
                           ) : null}
-
                           <div
                             className={cn(
-                              "rounded-2xl px-3 py-2",
+                              "rounded-2xl px-4 py-3",
                               isSelf
                                 ? "bg-primary text-primary-foreground"
-                                : "bg-muted/70 text-foreground",
-                              isSelf ? "rounded-br-md" : "rounded-bl-md",
-                              isFirstInGroup && (isSelf ? "rounded-tr-2xl" : "rounded-tl-2xl"),
-                              !isFirstInGroup && (isSelf ? "rounded-tr-md" : "rounded-tl-md"),
+                                : "bg-muted text-foreground",
+                              !isLastInGroup && "rounded-b-md",
                             )}
                           >
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">
+                            <p className="whitespace-pre-wrap leading-6">
                               {message.body}
                             </p>
                           </div>
-
                           {isLastInGroup ? (
-                            <div
-                              className={cn(
-                                "mt-1 px-1 text-[11px] text-muted-foreground",
-                                isSelf ? "text-right" : "text-left",
-                              )}
-                            >
+                            <p className="px-1 text-[11px] text-muted-foreground">
                               {formatTime(message.createdAt)}
-                              {isSelf && isLastMessage ? " · Seen" : ""}
-                            </div>
+                            </p>
                           ) : null}
                         </div>
-
-                        {isSelf ? (
-                          <div className={cn("w-9", !showAvatar && "invisible")}>
-                            <ProfileAvatar
-                              name={avatarName}
-                              className="h-9 w-9 text-[10px]"
-                            />
-                          </div>
-                        ) : null}
                       </div>
                     );
                   })}
                   <div ref={messageListEndRef} />
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
-                  No messages yet. Send the first message to start the conversation.
+                <div className="flex h-full min-h-[360px] items-center justify-center text-center text-sm text-muted-foreground">
+                  Start the conversation with {activeConversation.title}.
                 </div>
               )}
             </div>
-            <div className="sticky bottom-0 z-10 border-t bg-background/95 px-4 py-3 backdrop-blur lg:static lg:bg-transparent lg:backdrop-blur-none">
-              <div className="flex items-center gap-2">
+
+            <div className="border-t bg-background/90 px-4 py-3 lg:bg-transparent">
+              <div className="flex items-end gap-3">
                 <Input
                   ref={composerInputRef}
                   value={draftMessage}
                   onChange={(event) => setDraftMessage(event.target.value)}
-                  placeholder="Type a message"
-                  className="h-10"
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") handleSendMessage();
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleSendMessage();
+                    }
                   }}
+                  className="min-h-11"
+                  placeholder={`Message ${activeConversation.title}`}
                 />
-                <Button onClick={handleSendMessage} disabled={!draftMessage.trim()}>
-                  Send
+                <Button
+                  type="button"
+                  onClick={() => void handleSendMessage()}
+                  disabled={isSending || !draftMessage.trim()}
+                >
+                  {isSending ? "Sending..." : "Send"}
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-            Select a conversation on the left to open it.
+          <div className="hidden h-full items-center justify-center text-center text-sm text-muted-foreground lg:flex">
+            {isLoading
+              ? "Loading conversations..."
+              : "Pick a conversation or start a new chat from the sidebar."}
           </div>
         )}
       </div>

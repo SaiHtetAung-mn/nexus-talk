@@ -8,5 +8,11 @@ export const realtimeRooms = {
 export type RealtimeEventName =
   | 'system.ready'
   | 'system.pong'
+  | 'chat.message.created'
+  | 'chat.conversation.updated'
   | 'chat.typing.started'
-  | 'chat.typing.stopped';
+  | 'chat.typing.stopped'
+  | 'call.invite.created'
+  | 'call.updated'
+  | 'call.started'
+  | 'call.ended';
