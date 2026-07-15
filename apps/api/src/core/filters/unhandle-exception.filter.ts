@@ -29,6 +29,7 @@ class UnhandleExceptionFilter implements ExceptionFilter {
       .json({
         success: false,
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: null,
         error: {
           message,
         },

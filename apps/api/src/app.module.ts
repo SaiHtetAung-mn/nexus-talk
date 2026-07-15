@@ -12,6 +12,9 @@ import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/users.module';
 import { AccountModule } from './features/account/account.module';
 import mailConfig from './config/mail.config';
+import { RealtimeModule } from './features/realtime/realtime.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ApiResponseInterceptor } from './core/interceptors/api-response.interceptor';
 
 @Module({
   imports: [
@@ -44,11 +47,16 @@ import mailConfig from './config/mail.config';
     UserModule,
     AccountModule,
     AuthModule,
+    RealtimeModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiResponseInterceptor,
     },
   ],
 })

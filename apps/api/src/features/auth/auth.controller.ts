@@ -36,6 +36,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(200)
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -47,6 +48,7 @@ export class AuthController {
 
   @UseGuards(RefreshTokenGuard)
   @Post('refresh')
+  @HttpCode(200)
   async refresh(
     @Req() req: RefreshTokenRequest,
     @Res({ passthrough: true }) res: Response,
@@ -57,6 +59,7 @@ export class AuthController {
   }
 
   @Post('google')
+  @HttpCode(200)
   async loginWithGoogle(
     @Body() body: GoogleOAuthDto,
     @Res({ passthrough: true }) res: Response,

@@ -1,0 +1,160 @@
+import {
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import {
+  BadRequestException,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
+
+import type { Server } from 'socket.io';
+import { RealtimeService } from './realtime.service';
+import { realtimeRooms } from './realtime.rooms';
+import { WsAuthGuard } from './guards/ws-auth.guard';
+import type { AuthenticatedSocket } from './types/authenticated-socket.type';
+
+type JoinConversationPayload = {
+  conversationId: string;
+};
+
+type CallRoomPayload = {
+  callId: string;
+};
+
+type TypingPayload = {
+  conversationId: string;
+};
+
+@WebSocketGateway({
+  cors: {
+    origin: true,
+    credentials: true,
+  },
+})
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
+  @WebSocketServer()
+  private server: Server;
+
+  private readonly logger = new Logger(RealtimeGateway.name);
+
+  constructor(private readonly realtimeService: RealtimeService) {}
+
+  afterInit(server: Server) {
+    this.realtimeService.attachServer(server);
+  }
+
+  @UseGuards(WsAuthGuard)
+  handleConnection(client: AuthenticatedSocket) {
+    const user = client.data.user;
+    if (!user?._id) {
+      client.disconnect();
+      return;
+    }
+
+    client.join(realtimeRooms.user(user._id));
+    client.emit('system.ready', {
+      userId: user._id,
+    });
+    this.logger.debug(`Socket connected for user ${user._id}`);
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('system.ping')
+  handlePing() {
+    return {
+      event: 'system.pong',
+      data: {
+        ok: true,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('chat.conversation.join')
+  async handleJoinConversation(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: JoinConversationPayload,
+  ) {
+    const conversationId = payload?.conversationId?.trim();
+    if (!conversationId) {
+      throw new BadRequestException('conversationId is required');
+    }
+
+    await client.join(realtimeRooms.conversation(conversationId));
+
+    return {
+      event: 'chat.conversation.joined',
+      data: { conversationId },
+    };
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('call.room.join')
+  async handleJoinCallRoom(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: CallRoomPayload,
+  ) {
+    const callId = payload?.callId?.trim();
+    if (!callId) {
+      throw new BadRequestException('callId is required');
+    }
+
+    await client.join(realtimeRooms.call(callId));
+
+    return {
+      event: 'call.room.joined',
+      data: { callId },
+    };
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('chat.typing.start')
+  handleTypingStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: TypingPayload,
+  ) {
+    const conversationId = payload?.conversationId?.trim();
+    const user = client.data.user;
+
+    if (!conversationId) {
+      throw new BadRequestException('conversationId is required');
+    }
+
+    client.to(realtimeRooms.conversation(conversationId)).emit(
+      'chat.typing.started',
+      {
+        conversationId,
+        userId: user?._id ?? null,
+      },
+    );
+  }
+
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage('chat.typing.stop')
+  handleTypingStop(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: TypingPayload,
+  ) {
+    const conversationId = payload?.conversationId?.trim();
+    const user = client.data.user;
+
+    if (!conversationId) {
+      throw new BadRequestException('conversationId is required');
+    }
+
+    client.to(realtimeRooms.conversation(conversationId)).emit(
+      'chat.typing.stopped',
+      {
+        conversationId,
+        userId: user?._id ?? null,
+      },
+    );
+  }
+}
