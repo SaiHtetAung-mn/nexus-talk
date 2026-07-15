@@ -10,10 +10,14 @@ import {
 import {
   BadRequestException,
   Logger,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 
 import type { Server } from 'socket.io';
+import { authCookie } from '@/common/constants/auth-cookie.constant';
+import { AuthService } from '@/features/auth/auth.service';
+import { TokenExpiredException } from '@/features/auth/exceptions/token-expired.exception';
 import { RealtimeService } from './realtime.service';
 import { realtimeRooms } from './realtime.rooms';
 import { WsAuthGuard } from './guards/ws-auth.guard';
@@ -50,25 +54,41 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
   private readonly logger = new Logger(RealtimeGateway.name);
 
-  constructor(private readonly realtimeService: RealtimeService) {}
+  constructor(
+    private readonly realtimeService: RealtimeService,
+    private readonly authService: AuthService,
+  ) {}
 
   afterInit(server: Server) {
     this.realtimeService.attachServer(server);
   }
 
-  @UseGuards(WsAuthGuard)
-  handleConnection(client: AuthenticatedSocket) {
-    const user = client.data.user;
-    if (!user?._id) {
-      client.disconnect();
-      return;
-    }
+  async handleConnection(client: AuthenticatedSocket) {
+    try {
+      const cookies = parseCookieHeader(client.handshake.headers.cookie);
+      const accessToken = cookies[authCookie.ACCESS_TOKEN_COOKIE] ?? null;
+      const user = await this.authService.getCurrentUser(accessToken);
 
-    client.join(realtimeRooms.user(user._id));
-    client.emit('system.ready', {
-      userId: user._id,
-    });
-    this.logger.debug(`Socket connected for user ${user._id}`);
+      client.data.user = user;
+      client.join(realtimeRooms.user(user._id));
+      client.emit('system.ready', {
+        userId: user._id,
+      });
+      this.logger.debug(`Socket connected for user ${user._id}`);
+    } catch (error) {
+      if (error instanceof TokenExpiredException) {
+        client.emit('system.error', {
+          message: error.message,
+          token_expired: true,
+        });
+      } else if (error instanceof UnauthorizedException) {
+        client.emit('system.error', {
+          message: 'Unauthorized',
+        });
+      }
+
+      client.disconnect();
+    }
   }
 
   @UseGuards(WsAuthGuard)
@@ -219,4 +239,30 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
       candidate: payload.candidate ?? null,
     });
   }
+}
+
+function parseCookieHeader(cookieHeader?: string): Record<string, string> {
+  if (!cookieHeader) {
+    return {};
+  }
+
+  return cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce<Record<string, string>>((accumulator, part) => {
+      const separatorIndex = part.indexOf('=');
+      if (separatorIndex < 0) {
+        return accumulator;
+      }
+
+      const key = part.slice(0, separatorIndex).trim();
+      const value = decodeURIComponent(part.slice(separatorIndex + 1).trim());
+
+      if (key) {
+        accumulator[key] = value;
+      }
+
+      return accumulator;
+    }, {});
 }

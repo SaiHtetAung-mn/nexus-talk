@@ -23,7 +23,13 @@ export class App {
 
   private config() {
     const config = this.app.get(ConfigService);
-    this.app.use(helmet());
+    this.app.use(
+      helmet({
+        crossOriginOpenerPolicy: {
+          policy: 'same-origin-allow-popups',
+        },
+      }),
+    );
     this.app.use(cookieParser());
     this.app.enableCors({
       origin: config.get<Array<string>>('app.allowOrigins'),

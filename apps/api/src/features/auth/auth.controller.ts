@@ -99,6 +99,6 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @Get('me')
   getCurrentUser(@Req() req: AuthenticatedRequest) {
-    return { user: req.user };
+    return req.user;
   }
 }

@@ -178,15 +178,7 @@ export function HomePage() {
   }, [messagesByConversation, selectedConversationId]);
 
   useEffect(() => {
-    if (!selectedConversationId) {
-      return;
-    }
-
-    const conversationId = selectedConversationId;
     const socket = getRealtimeSocket();
-    socket.emit("chat.conversation.join", {
-      conversationId,
-    });
 
     function handleMessageCreated(message: WorkspaceMessage) {
       setMessagesByConversation((previous) => upsertMessage(previous, message));
@@ -212,6 +204,17 @@ export function HomePage() {
       socket.off("chat.message.created", handleMessageCreated);
       socket.off("chat.conversation.updated", handleConversationUpdated);
     };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      return;
+    }
+
+    const socket = getRealtimeSocket();
+    socket.emit("chat.conversation.join", {
+      conversationId: selectedConversationId,
+    });
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -392,7 +395,7 @@ export function HomePage() {
                       <div
                         key={message._id}
                         className={cn(
-                          "flex gap-2",
+                          "flex w-full gap-2",
                           isSelf ? "justify-end" : "justify-start",
                         )}
                       >
@@ -407,7 +410,7 @@ export function HomePage() {
 
                         <div
                           className={cn(
-                            "max-w-[78%] space-y-1",
+                            "flex max-w-[78%] flex-col space-y-1",
                             isSelf && "items-end text-right",
                           )}
                         >

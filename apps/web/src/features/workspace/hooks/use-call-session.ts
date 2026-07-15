@@ -29,110 +29,24 @@ export function useCallSession({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const [isMediaReady, setIsMediaReady] = useState(false);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
-  useEffect(() => {
-    if (!call?._id || !currentUserId) {
-      return;
+  const syncVideoElements = useCallback(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
     }
 
-    const activeCall = call;
-    const userId = currentUserId;
-    const socket = getRealtimeSocket();
-    socket.emit("call.room.join", { callId: activeCall._id });
-
-    async function handleOffer(payload: SignalPayload) {
-      if (
-        payload.callId !== activeCall._id ||
-        payload.fromUserId === userId
-      ) {
-        return;
-      }
-
-      const peer = await ensurePeerConnection(
-        socket,
-        activeCall,
-        userId,
-      );
-      if (!payload.description) {
-        return;
-      }
-
-      await peer.setRemoteDescription(
-        new RTCSessionDescription(payload.description),
-      );
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-
-      socket.emit("call.signal.answer", {
-        callId: activeCall._id,
-        targetUserId: payload.fromUserId,
-        description: answer,
-      });
+    if (remoteVideoRef.current && remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
     }
-
-    async function handleAnswer(payload: SignalPayload) {
-      if (
-        payload.callId !== activeCall._id ||
-        payload.fromUserId === userId
-      ) {
-        return;
-      }
-
-      const peer = peerConnectionRef.current;
-      if (!peer || !payload.description) {
-        return;
-      }
-
-      await peer.setRemoteDescription(
-        new RTCSessionDescription(payload.description),
-      );
-    }
-
-    async function handleIceCandidate(payload: SignalPayload) {
-      if (
-        payload.callId !== activeCall._id ||
-        payload.fromUserId === userId
-      ) {
-        return;
-      }
-
-      if (!payload.candidate || !peerConnectionRef.current) {
-        return;
-      }
-
-      await peerConnectionRef.current.addIceCandidate(
-        new RTCIceCandidate(payload.candidate),
-      );
-    }
-
-    function handleCallEnded(payload: { callId: string }) {
-      if (payload.callId !== activeCall._id) {
-        return;
-      }
-
-      toast.message("Call ended");
-      teardown();
-    }
-
-    socket.on("call.signal.offer", handleOffer);
-    socket.on("call.signal.answer", handleAnswer);
-    socket.on("call.signal.ice-candidate", handleIceCandidate);
-    socket.on("call.ended", handleCallEnded);
-
-    return () => {
-      socket.off("call.signal.offer", handleOffer);
-      socket.off("call.signal.answer", handleAnswer);
-      socket.off("call.signal.ice-candidate", handleIceCandidate);
-      socket.off("call.ended", handleCallEnded);
-      teardown();
-    };
-  }, [call, currentUserId, ensurePeerConnection, teardown]);
+  }, []);
 
   const startMedia = useCallback(async () => {
     if (localStreamRef.current) {
+      syncVideoElements();
       return localStreamRef.current;
     }
 
@@ -144,14 +58,40 @@ export function useCallSession({
       });
 
       localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
       setIsMediaReady(true);
+      syncVideoElements();
       return stream;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to access camera and microphone.";
+      toast.error(message);
+      throw error;
     } finally {
       setIsBusy(false);
+    }
+  }, [syncVideoElements]);
+
+  const flushPendingIceCandidates = useCallback(async (
+    peerConnection: RTCPeerConnection,
+  ) => {
+    if (!peerConnection.remoteDescription) {
+      return;
+    }
+
+    while (pendingIceCandidatesRef.current.length > 0) {
+      const candidate = pendingIceCandidatesRef.current.shift();
+
+      if (!candidate) {
+        continue;
+      }
+
+      try {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {
+        // Ignore stale candidates from a previous negotiation attempt.
+      }
     }
   }, []);
 
@@ -168,10 +108,7 @@ export function useCallSession({
     const peerConnection = new RTCPeerConnection(rtcConfiguration);
     const remoteStream = new MediaStream();
     remoteStreamRef.current = remoteStream;
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
+    syncVideoElements();
 
     stream.getTracks().forEach((track) => {
       peerConnection.addTrack(track, stream);
@@ -179,9 +116,30 @@ export function useCallSession({
 
     peerConnection.ontrack = (event) => {
       event.streams[0]?.getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
+        const exists = remoteStream
+          .getTracks()
+          .some((existingTrack) => existingTrack.id === track.id);
+
+        if (!exists) {
+          remoteStream.addTrack(track);
+        }
       });
       setRemoteConnected(true);
+      syncVideoElements();
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      if (peerConnection.connectionState === "failed") {
+        toast.error("Unable to establish the video connection.");
+      }
+
+      if (
+        peerConnection.connectionState === "closed" ||
+        peerConnection.connectionState === "disconnected" ||
+        peerConnection.connectionState === "failed"
+      ) {
+        setRemoteConnected(false);
+      }
     };
 
     peerConnection.onicecandidate = (event) => {
@@ -202,7 +160,7 @@ export function useCallSession({
 
     peerConnectionRef.current = peerConnection;
     return peerConnection;
-  }, [startMedia]);
+  }, [startMedia, syncVideoElements]);
 
   const beginPeerSession = useCallback(async () => {
     if (!call || !currentUserId) {
@@ -232,13 +190,134 @@ export function useCallSession({
   const teardown = useCallback(() => {
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
+    pendingIceCandidatesRef.current = [];
     remoteStreamRef.current?.getTracks().forEach((track) => track.stop());
     remoteStreamRef.current = null;
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
     setRemoteConnected(false);
     setIsMediaReady(false);
   }, []);
+
+  useEffect(() => {
+    syncVideoElements();
+  }, [isMediaReady, remoteConnected, syncVideoElements]);
+
+  useEffect(() => {
+    if (!call?._id || !currentUserId) {
+      return;
+    }
+
+    const activeCall = call;
+    const userId = currentUserId;
+    const socket = getRealtimeSocket();
+    socket.emit("call.room.join", { callId: activeCall._id });
+
+    async function handleOffer(payload: SignalPayload) {
+      if (
+        payload.callId !== activeCall._id ||
+        payload.fromUserId === userId
+      ) {
+        return;
+      }
+
+      const peer = await ensurePeerConnection(socket, activeCall, userId);
+      if (!payload.description) {
+        return;
+      }
+
+      await peer.setRemoteDescription(
+        new RTCSessionDescription(payload.description),
+      );
+      await flushPendingIceCandidates(peer);
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+
+      socket.emit("call.signal.answer", {
+        callId: activeCall._id,
+        targetUserId: payload.fromUserId,
+        description: answer,
+      });
+    }
+
+    async function handleAnswer(payload: SignalPayload) {
+      if (
+        payload.callId !== activeCall._id ||
+        payload.fromUserId === userId
+      ) {
+        return;
+      }
+
+      const peer = peerConnectionRef.current;
+      if (!peer || !payload.description) {
+        return;
+      }
+
+      await peer.setRemoteDescription(
+        new RTCSessionDescription(payload.description),
+      );
+      await flushPendingIceCandidates(peer);
+    }
+
+    async function handleIceCandidate(payload: SignalPayload) {
+      if (
+        payload.callId !== activeCall._id ||
+        payload.fromUserId === userId
+      ) {
+        return;
+      }
+
+      if (!payload.candidate) {
+        return;
+      }
+
+      const peer = peerConnectionRef.current;
+      if (!peer || !peer.remoteDescription) {
+        pendingIceCandidatesRef.current.push(payload.candidate);
+        return;
+      }
+
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(payload.candidate));
+      } catch {
+        pendingIceCandidatesRef.current.push(payload.candidate);
+      }
+    }
+
+    function handleCallEnded(payload: { callId: string }) {
+      if (payload.callId !== activeCall._id) {
+        return;
+      }
+
+      toast.message("Call ended");
+      teardown();
+    }
+
+    socket.on("call.signal.offer", handleOffer);
+    socket.on("call.signal.answer", handleAnswer);
+    socket.on("call.signal.ice-candidate", handleIceCandidate);
+    socket.on("call.ended", handleCallEnded);
+
+    return () => {
+      socket.off("call.signal.offer", handleOffer);
+      socket.off("call.signal.answer", handleAnswer);
+      socket.off("call.signal.ice-candidate", handleIceCandidate);
+      socket.off("call.ended", handleCallEnded);
+      teardown();
+    };
+  }, [
+    call,
+    currentUserId,
+    ensurePeerConnection,
+    flushPendingIceCandidates,
+    teardown,
+  ]);
 
   return {
     localVideoRef,

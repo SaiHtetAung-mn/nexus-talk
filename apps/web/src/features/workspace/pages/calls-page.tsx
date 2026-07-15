@@ -116,7 +116,15 @@ export function CallsPage() {
     }
 
     async function handleCallInvite(call: CallSession) {
-      toast.message(`Incoming video call from ${call.participants[0]?.name ?? "contact"}`);
+      const caller = call.participants.find(
+        (participant) => participant._id !== currentUser?._id,
+      );
+
+      setActiveCall(call);
+      navigate(`/calls?call=${encodeURIComponent(call._id)}`);
+      toast.message(
+        `Incoming video call from ${caller?.name ?? "contact"}`,
+      );
       await handleCallUpdated(call);
     }
 
@@ -142,7 +150,7 @@ export function CallsPage() {
       socket.off("call.started", handleCallUpdated);
       socket.off("call.ended");
     };
-  }, [activeCallId, navigate]);
+  }, [activeCallId, currentUser?._id, navigate]);
 
   useEffect(() => {
     async function bootstrapMedia() {

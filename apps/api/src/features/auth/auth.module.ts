@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -24,7 +24,7 @@ import { RefreshTokenService } from './refresh-token.service';
   ],
   exports: [AuthService, AuthGuard, RefreshTokenGuard],
   imports: [
-    UserModule,
+    forwardRef(() => UserModule),
     JwtModule.register({}),
     TypeOrmModule.forFeature([EmailVerification, RefreshToken]),
     MailerModule,

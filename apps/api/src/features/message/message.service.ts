@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { Db, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 
-import { Conversation } from '@/database/entities/Conversation';
 import { Message } from '@/database/entities/Message';
+import { ConversationRepository } from '@/features/conversation/conversation.repository';
 import { RealtimeService } from '@/features/realtime/realtime.service';
 import { ConversationService } from '@/features/conversation/conversation.service';
 import type { MessageResponseDto } from './dto/message-response.dto';
@@ -14,9 +12,9 @@ import { MessageRepository } from './message.repository';
 export class MessageService {
   constructor(
     private readonly messageRepository: MessageRepository,
+    private readonly conversationRepository: ConversationRepository,
     private readonly conversationService: ConversationService,
     private readonly realtimeService: RealtimeService,
-    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async listMessages(
@@ -47,11 +45,7 @@ export class MessageService {
       senderId,
     );
 
-    const conversationsCollection =
-      ((this.dataSource.mongoManager as unknown as { databaseConnection: Db })
-        .databaseConnection).collection<Conversation>('conversations');
-
-    const updateResult = await conversationsCollection.findOneAndUpdate(
+    const updatedConversation = (await this.conversationRepository.findOneAndUpdate(
       {
         _id: new ObjectId(conversationId),
         member_ids: senderId,
@@ -63,9 +57,7 @@ export class MessageService {
       {
         returnDocument: 'after',
       },
-    );
-
-    const updatedConversation = updateResult as unknown as Conversation | null;
+    )) as { next_message_sequence?: number } | null;
     const sequence = updatedConversation?.next_message_sequence ?? 1;
 
     const entity = this.messageRepository.create({
@@ -78,7 +70,7 @@ export class MessageService {
 
     const saved = await this.messageRepository.save(entity);
 
-    await conversationsCollection.updateOne(
+    await this.conversationRepository.updateOne(
       { _id: new ObjectId(conversationId) },
       {
         $set: {
@@ -99,6 +91,7 @@ export class MessageService {
     );
 
     for (const memberId of conversation.member_ids) {
+      this.realtimeService.emitToUser(memberId, 'chat.message.created', payload);
       this.realtimeService.emitToUser(memberId, 'chat.conversation.updated', {
         conversationId,
       });

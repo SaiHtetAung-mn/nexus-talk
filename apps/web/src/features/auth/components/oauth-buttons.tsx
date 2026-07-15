@@ -68,7 +68,6 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
         <GoogleLogin
           onSuccess={handleSuccess}
           onError={handleError}
-          useOneTap
         />
         {isAuthenticating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-md bg-background/80 text-sm text-muted-foreground">
