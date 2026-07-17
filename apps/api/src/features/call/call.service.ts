@@ -7,6 +7,7 @@ import { ObjectId } from 'mongodb';
 
 import { CallSession } from '@/database/entities/CallSession';
 import { ConversationService } from '@/features/conversation/conversation.service';
+import { realtimeServerEvents } from '@/features/realtime/realtime.events';
 import { RealtimeService } from '@/features/realtime/realtime.service';
 import { UserService } from '@/features/user/user.service';
 import type { UserResponseDto } from '@/features/user/dto/user-response.dto';
@@ -84,7 +85,11 @@ export class CallService {
     const response = await this.toResponse(saved);
 
     for (const participantId of conversation.member_ids) {
-      this.realtimeService.emitToUser(participantId, 'call.invite.created', response);
+      this.realtimeService.emitToUser(
+        participantId,
+        realtimeServerEvents.callInviteCreated,
+        response,
+      );
     }
 
     return response;
@@ -105,9 +110,17 @@ export class CallService {
     const saved = await this.callRepository.save(call);
     const response = await this.toResponse(saved);
 
-    this.realtimeService.emitToCall(saved._id.toString(), 'call.started', response);
+    this.realtimeService.emitToCall(
+      saved._id.toString(),
+      realtimeServerEvents.callStarted,
+      response,
+    );
     for (const participantId of saved.participant_ids) {
-      this.realtimeService.emitToUser(participantId, 'call.updated', response);
+      this.realtimeService.emitToUser(
+        participantId,
+        realtimeServerEvents.callUpdated,
+        response,
+      );
     }
 
     return response;
@@ -124,13 +137,17 @@ export class CallService {
     const saved = await this.callRepository.save(call);
     const response = await this.toResponse(saved);
 
-    this.realtimeService.emitToCall(saved._id.toString(), 'call.ended', {
+    this.realtimeService.emitToCall(saved._id.toString(), realtimeServerEvents.callEnded, {
       callId: saved._id.toString(),
     });
 
     for (const participantId of saved.participant_ids) {
-      this.realtimeService.emitToUser(participantId, 'call.updated', response);
-      this.realtimeService.emitToUser(participantId, 'call.ended', {
+      this.realtimeService.emitToUser(
+        participantId,
+        realtimeServerEvents.callUpdated,
+        response,
+      );
+      this.realtimeService.emitToUser(participantId, realtimeServerEvents.callEnded, {
         callId: saved._id.toString(),
       });
     }

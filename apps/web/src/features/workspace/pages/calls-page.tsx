@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { useAuthStore } from "@/features/auth/store/auth-store";
+import { realtimeServerEvents } from "@/features/workspace/lib/realtime-events";
 import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 import { listCalls } from "@/features/workspace/api/list-calls";
 import type { CallSession } from "@/features/workspace/api/types";
@@ -66,16 +67,16 @@ export function CallsPage() {
       }
     }
 
-    socket.on("call.invite.created", refreshCalls);
-    socket.on("call.updated", refreshCalls);
-    socket.on("call.started", refreshCalls);
-    socket.on("call.ended", refreshCalls);
+    socket.on(realtimeServerEvents.callInviteCreated, refreshCalls);
+    socket.on(realtimeServerEvents.callUpdated, refreshCalls);
+    socket.on(realtimeServerEvents.callStarted, refreshCalls);
+    socket.on(realtimeServerEvents.callEnded, refreshCalls);
 
     return () => {
-      socket.off("call.invite.created", refreshCalls);
-      socket.off("call.updated", refreshCalls);
-      socket.off("call.started", refreshCalls);
-      socket.off("call.ended", refreshCalls);
+      socket.off(realtimeServerEvents.callInviteCreated, refreshCalls);
+      socket.off(realtimeServerEvents.callUpdated, refreshCalls);
+      socket.off(realtimeServerEvents.callStarted, refreshCalls);
+      socket.off(realtimeServerEvents.callEnded, refreshCalls);
     };
   }, []);
 

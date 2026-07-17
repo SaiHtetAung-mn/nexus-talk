@@ -16,6 +16,7 @@ import { useAuthStore } from "@/features/auth/store/auth-store";
 import { logoutUser } from "@/features/auth/api/logout";
 import { acceptVideoCall } from "@/features/workspace/api/accept-video-call";
 import { endCall } from "@/features/workspace/api/end-call";
+import { realtimeServerEvents } from "@/features/workspace/lib/realtime-events";
 import { disconnectRealtimeSocket, getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 import { openCallWindow } from "@/features/workspace/lib/open-call-window";
 import { startRingtone, type RingtoneController } from "@/features/workspace/lib/ringtone";
@@ -73,16 +74,16 @@ export function DashboardLayout() {
       );
     }
 
-    socket.on("call.invite.created", handleCallInvite);
-    socket.on("call.updated", handleCallUpdated);
-    socket.on("call.started", handleCallUpdated);
-    socket.on("call.ended", handleCallEnded);
+    socket.on(realtimeServerEvents.callInviteCreated, handleCallInvite);
+    socket.on(realtimeServerEvents.callUpdated, handleCallUpdated);
+    socket.on(realtimeServerEvents.callStarted, handleCallUpdated);
+    socket.on(realtimeServerEvents.callEnded, handleCallEnded);
 
     return () => {
-      socket.off("call.invite.created", handleCallInvite);
-      socket.off("call.updated", handleCallUpdated);
-      socket.off("call.started", handleCallUpdated);
-      socket.off("call.ended", handleCallEnded);
+      socket.off(realtimeServerEvents.callInviteCreated, handleCallInvite);
+      socket.off(realtimeServerEvents.callUpdated, handleCallUpdated);
+      socket.off(realtimeServerEvents.callStarted, handleCallUpdated);
+      socket.off(realtimeServerEvents.callEnded, handleCallEnded);
     };
   }, [user?._id]);
 

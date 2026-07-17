@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 
 import { Message } from '@/database/entities/Message';
 import { ConversationRepository } from '@/features/conversation/conversation.repository';
+import { realtimeServerEvents } from '@/features/realtime/realtime.events';
 import { RealtimeService } from '@/features/realtime/realtime.service';
 import { ConversationService } from '@/features/conversation/conversation.service';
 import type { MessageResponseDto } from './dto/message-response.dto';
@@ -86,13 +87,17 @@ export class MessageService {
     const payload = this.toResponse(saved);
     this.realtimeService.emitToConversation(
       conversationId,
-      'chat.message.created',
+      realtimeServerEvents.chatMessageCreated,
       payload,
     );
 
     for (const memberId of conversation.member_ids) {
-      this.realtimeService.emitToUser(memberId, 'chat.message.created', payload);
-      this.realtimeService.emitToUser(memberId, 'chat.conversation.updated', {
+      this.realtimeService.emitToUser(
+        memberId,
+        realtimeServerEvents.chatMessageCreated,
+        payload,
+      );
+      this.realtimeService.emitToUser(memberId, realtimeServerEvents.chatConversationUpdated, {
         conversationId,
       });
     }

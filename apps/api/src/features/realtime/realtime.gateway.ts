@@ -19,6 +19,10 @@ import { authCookie } from '@/common/constants/auth-cookie.constant';
 import { AuthService } from '@/features/auth/auth.service';
 import { TokenExpiredException } from '@/features/auth/exceptions/token-expired.exception';
 import { RealtimeAccessService } from './realtime-access.service';
+import {
+  realtimeClientEvents,
+  realtimeServerEvents,
+} from './realtime.events';
 import { RealtimeService } from './realtime.service';
 import { realtimeRooms } from './realtime.rooms';
 import { WsAuthGuard } from './guards/ws-auth.guard';
@@ -73,18 +77,18 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
       client.data.user = user;
       client.join(realtimeRooms.user(user._id));
-      client.emit('system.ready', {
+      client.emit(realtimeServerEvents.systemReady, {
         userId: user._id,
       });
       this.logger.debug(`Socket connected for user ${user._id}`);
     } catch (error) {
       if (error instanceof TokenExpiredException) {
-        client.emit('system.error', {
+        client.emit(realtimeServerEvents.systemError, {
           message: error.message,
           token_expired: true,
         });
       } else if (error instanceof UnauthorizedException) {
-        client.emit('system.error', {
+        client.emit(realtimeServerEvents.systemError, {
           message: 'Unauthorized',
         });
       }
@@ -94,10 +98,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('system.ping')
+  @SubscribeMessage(realtimeClientEvents.systemPing)
   handlePing() {
     return {
-      event: 'system.pong',
+      event: realtimeServerEvents.systemPong,
       data: {
         ok: true,
         timestamp: new Date().toISOString(),
@@ -106,7 +110,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('chat.conversation.join')
+  @SubscribeMessage(realtimeClientEvents.chatConversationJoin)
   async handleJoinConversation(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: JoinConversationPayload,
@@ -124,13 +128,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     await client.join(realtimeRooms.conversation(conversationId));
 
     return {
-      event: 'chat.conversation.joined',
+      event: realtimeServerEvents.chatConversationJoined,
       data: { conversationId },
     };
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('call.room.join')
+  @SubscribeMessage(realtimeClientEvents.callRoomJoin)
   async handleJoinCallRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallRoomPayload,
@@ -145,13 +149,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     await client.join(realtimeRooms.call(callId));
 
     return {
-      event: 'call.room.joined',
+      event: realtimeServerEvents.callRoomJoined,
       data: { callId },
     };
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('chat.typing.start')
+  @SubscribeMessage(realtimeClientEvents.chatTypingStart)
   handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: TypingPayload,
@@ -164,7 +168,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     }
 
     client.to(realtimeRooms.conversation(conversationId)).emit(
-      'chat.typing.started',
+      realtimeServerEvents.chatTypingStarted,
       {
         conversationId,
         userId: user?._id ?? null,
@@ -173,7 +177,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('chat.typing.stop')
+  @SubscribeMessage(realtimeClientEvents.chatTypingStop)
   handleTypingStop(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: TypingPayload,
@@ -186,7 +190,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     }
 
     client.to(realtimeRooms.conversation(conversationId)).emit(
-      'chat.typing.stopped',
+      realtimeServerEvents.chatTypingStopped,
       {
         conversationId,
         userId: user?._id ?? null,
@@ -195,38 +199,50 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('call.signal.offer')
+  @SubscribeMessage(realtimeClientEvents.callSignalOffer)
   handleOffer(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    return this.emitCallSignal(client, 'call.signal.offer', payload);
+    return this.emitCallSignal(
+      client,
+      realtimeServerEvents.callSignalOffer,
+      payload,
+    );
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('call.signal.answer')
+  @SubscribeMessage(realtimeClientEvents.callSignalAnswer)
   handleAnswer(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    return this.emitCallSignal(client, 'call.signal.answer', payload);
+    return this.emitCallSignal(
+      client,
+      realtimeServerEvents.callSignalAnswer,
+      payload,
+    );
   }
 
   @UseGuards(WsAuthGuard)
-  @SubscribeMessage('call.signal.ice-candidate')
+  @SubscribeMessage(realtimeClientEvents.callSignalIceCandidate)
   handleIceCandidate(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    return this.emitCallSignal(client, 'call.signal.ice-candidate', payload);
+    return this.emitCallSignal(
+      client,
+      realtimeServerEvents.callSignalIceCandidate,
+      payload,
+    );
   }
 
   private async emitCallSignal(
     client: AuthenticatedSocket,
     event:
-      | 'call.signal.offer'
-      | 'call.signal.answer'
-      | 'call.signal.ice-candidate',
+      | typeof realtimeServerEvents.callSignalOffer
+      | typeof realtimeServerEvents.callSignalAnswer
+      | typeof realtimeServerEvents.callSignalIceCandidate,
     payload: CallSignalPayload,
   ) {
     const callId = payload?.callId?.trim();

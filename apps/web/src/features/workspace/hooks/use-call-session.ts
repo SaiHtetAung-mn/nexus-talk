@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { realtimeClientEvents, realtimeServerEvents } from "@/features/workspace/lib/realtime-events";
 import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 import type { CallSession } from "@/features/workspace/api/types";
 
@@ -158,7 +159,7 @@ export function useCallSession({
         return;
       }
 
-      socket.emit("call.signal.ice-candidate", {
+      socket.emit(realtimeClientEvents.callSignalIceCandidate, {
         callId: activeCall._id,
         targetUserId,
         candidate: event.candidate.toJSON(),
@@ -188,7 +189,7 @@ export function useCallSession({
     const offer = await peer.createOffer();
     await peer.setLocalDescription(offer);
 
-    socket.emit("call.signal.offer", {
+    socket.emit(realtimeClientEvents.callSignalOffer, {
       callId: activeCall._id,
       targetUserId,
       description: offer,
@@ -253,7 +254,7 @@ export function useCallSession({
     const activeCall = callRef.current;
     const userId = currentUserId;
     const socket = getRealtimeSocket();
-    socket.emit("call.room.join", { callId: activeCall._id });
+    socket.emit(realtimeClientEvents.callRoomJoin, { callId: activeCall._id });
 
     async function handleOffer(payload: SignalPayload) {
       if (
@@ -275,7 +276,7 @@ export function useCallSession({
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
 
-      socket.emit("call.signal.answer", {
+      socket.emit(realtimeClientEvents.callSignalAnswer, {
         callId: activeCall._id,
         targetUserId: payload.fromUserId,
         description: answer,
@@ -334,16 +335,16 @@ export function useCallSession({
       teardown();
     }
 
-    socket.on("call.signal.offer", handleOffer);
-    socket.on("call.signal.answer", handleAnswer);
-    socket.on("call.signal.ice-candidate", handleIceCandidate);
-    socket.on("call.ended", handleCallEnded);
+    socket.on(realtimeServerEvents.callSignalOffer, handleOffer);
+    socket.on(realtimeServerEvents.callSignalAnswer, handleAnswer);
+    socket.on(realtimeServerEvents.callSignalIceCandidate, handleIceCandidate);
+    socket.on(realtimeServerEvents.callEnded, handleCallEnded);
 
     return () => {
-      socket.off("call.signal.offer", handleOffer);
-      socket.off("call.signal.answer", handleAnswer);
-      socket.off("call.signal.ice-candidate", handleIceCandidate);
-      socket.off("call.ended", handleCallEnded);
+      socket.off(realtimeServerEvents.callSignalOffer, handleOffer);
+      socket.off(realtimeServerEvents.callSignalAnswer, handleAnswer);
+      socket.off(realtimeServerEvents.callSignalIceCandidate, handleIceCandidate);
+      socket.off(realtimeServerEvents.callEnded, handleCallEnded);
       teardown();
     };
   }, [

@@ -20,6 +20,10 @@ import type {
   ConversationPreview,
   WorkspaceMessage,
 } from "@/features/workspace/api/types";
+import {
+  realtimeClientEvents,
+  realtimeServerEvents,
+} from "@/features/workspace/lib/realtime-events";
 import { openCallWindow } from "@/features/workspace/lib/open-call-window";
 import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 
@@ -198,12 +202,18 @@ export function HomePage() {
       }
     }
 
-    socket.on("chat.message.created", handleMessageCreated);
-    socket.on("chat.conversation.updated", handleConversationUpdated);
+    socket.on(realtimeServerEvents.chatMessageCreated, handleMessageCreated);
+    socket.on(
+      realtimeServerEvents.chatConversationUpdated,
+      handleConversationUpdated,
+    );
 
     return () => {
-      socket.off("chat.message.created", handleMessageCreated);
-      socket.off("chat.conversation.updated", handleConversationUpdated);
+      socket.off(realtimeServerEvents.chatMessageCreated, handleMessageCreated);
+      socket.off(
+        realtimeServerEvents.chatConversationUpdated,
+        handleConversationUpdated,
+      );
     };
   }, []);
 
@@ -213,7 +223,7 @@ export function HomePage() {
     }
 
     const socket = getRealtimeSocket();
-    socket.emit("chat.conversation.join", {
+    socket.emit(realtimeClientEvents.chatConversationJoin, {
       conversationId: selectedConversationId,
     });
   }, [selectedConversationId]);

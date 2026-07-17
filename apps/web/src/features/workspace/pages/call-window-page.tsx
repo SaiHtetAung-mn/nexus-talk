@@ -20,6 +20,7 @@ import { endCall } from "@/features/workspace/api/end-call";
 import { getCall } from "@/features/workspace/api/get-call";
 import type { CallSession } from "@/features/workspace/api/types";
 import { useCallSession } from "@/features/workspace/hooks/use-call-session";
+import { realtimeServerEvents } from "@/features/workspace/lib/realtime-events";
 import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 import { cn } from "@/lib/utils";
 
@@ -165,14 +166,14 @@ export function CallWindowPage() {
       );
     }
 
-    socket.on("call.updated", handleCallUpdated);
-    socket.on("call.started", handleCallUpdated);
-    socket.on("call.ended", handleCallEnded);
+    socket.on(realtimeServerEvents.callUpdated, handleCallUpdated);
+    socket.on(realtimeServerEvents.callStarted, handleCallUpdated);
+    socket.on(realtimeServerEvents.callEnded, handleCallEnded);
 
     return () => {
-      socket.off("call.updated", handleCallUpdated);
-      socket.off("call.started", handleCallUpdated);
-      socket.off("call.ended", handleCallEnded);
+      socket.off(realtimeServerEvents.callUpdated, handleCallUpdated);
+      socket.off(realtimeServerEvents.callStarted, handleCallUpdated);
+      socket.off(realtimeServerEvents.callEnded, handleCallEnded);
     };
   }, [callId]);
 
