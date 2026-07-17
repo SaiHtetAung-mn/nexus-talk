@@ -20,6 +20,7 @@ import type {
   ConversationPreview,
   WorkspaceMessage,
 } from "@/features/workspace/api/types";
+import { openCallWindow } from "@/features/workspace/lib/open-call-window";
 import { getRealtimeSocket } from "@/features/workspace/lib/realtime-client";
 
 function formatTime(value: string | null) {
@@ -289,11 +290,17 @@ export function HomePage() {
       return;
     }
 
+    const popup = openCallWindow();
+    if (popup.isPopupBlocked) {
+      toast.message("Popup was blocked. Opening call in this tab.");
+    }
+
     try {
       const call = await startVideoCall(selectedConversationId);
       toast.success("Video call started");
-      navigate(`/calls?call=${encodeURIComponent(call._id)}`);
+      popup.navigateTo(call._id);
     } catch (error) {
+      popup.close();
       const message =
         error instanceof Error ? error.message : "Unable to start video call.";
       toast.error(message);

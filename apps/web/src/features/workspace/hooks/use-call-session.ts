@@ -24,6 +24,7 @@ export function useCallSession({
   call,
   currentUserId,
 }: UseCallSessionOptions) {
+  const callRef = useRef<CallSession | null>(call);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -33,6 +34,12 @@ export function useCallSession({
   const [isMediaReady, setIsMediaReady] = useState(false);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+
+  useEffect(() => {
+    callRef.current = call;
+  }, [call]);
 
   const syncVideoElements = useCallback(() => {
     if (localVideoRef.current && localStreamRef.current) {
@@ -163,12 +170,13 @@ export function useCallSession({
   }, [startMedia, syncVideoElements]);
 
   const beginPeerSession = useCallback(async () => {
-    if (!call || !currentUserId) {
+    const activeCall = callRef.current;
+    if (!activeCall || !currentUserId) {
       return;
     }
 
     const socket = getRealtimeSocket();
-    const targetUserId = call.participants.find(
+    const targetUserId = activeCall.participants.find(
       (participant) => participant._id !== currentUserId,
     )?._id;
 
@@ -176,16 +184,42 @@ export function useCallSession({
       return;
     }
 
-    const peer = await ensurePeerConnection(socket, call, currentUserId);
+    const peer = await ensurePeerConnection(socket, activeCall, currentUserId);
     const offer = await peer.createOffer();
     await peer.setLocalDescription(offer);
 
     socket.emit("call.signal.offer", {
-      callId: call._id,
+      callId: activeCall._id,
       targetUserId,
       description: offer,
     });
-  }, [call, currentUserId, ensurePeerConnection]);
+  }, [currentUserId, ensurePeerConnection]);
+
+  const toggleAudioMute = useCallback(() => {
+    const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
+    if (audioTracks.length === 0) {
+      return;
+    }
+
+    const nextMuted = !audioTracks.every((track) => track.enabled === false);
+    audioTracks.forEach((track) => {
+      track.enabled = nextMuted === false;
+    });
+    setIsAudioMuted(nextMuted);
+  }, []);
+
+  const toggleVideoMute = useCallback(() => {
+    const videoTracks = localStreamRef.current?.getVideoTracks() ?? [];
+    if (videoTracks.length === 0) {
+      return;
+    }
+
+    const nextMuted = !videoTracks.every((track) => track.enabled === false);
+    videoTracks.forEach((track) => {
+      track.enabled = nextMuted === false;
+    });
+    setIsVideoMuted(nextMuted);
+  }, []);
 
   const teardown = useCallback(() => {
     peerConnectionRef.current?.close();
@@ -203,6 +237,8 @@ export function useCallSession({
     }
     setRemoteConnected(false);
     setIsMediaReady(false);
+    setIsAudioMuted(false);
+    setIsVideoMuted(false);
   }, []);
 
   useEffect(() => {
@@ -210,11 +246,11 @@ export function useCallSession({
   }, [isMediaReady, remoteConnected, syncVideoElements]);
 
   useEffect(() => {
-    if (!call?._id || !currentUserId) {
+    if (!callRef.current?._id || !currentUserId) {
       return;
     }
 
-    const activeCall = call;
+    const activeCall = callRef.current;
     const userId = currentUserId;
     const socket = getRealtimeSocket();
     socket.emit("call.room.join", { callId: activeCall._id });
@@ -312,7 +348,7 @@ export function useCallSession({
       teardown();
     };
   }, [
-    call,
+    call?._id,
     currentUserId,
     ensurePeerConnection,
     flushPendingIceCandidates,
@@ -325,8 +361,12 @@ export function useCallSession({
     isMediaReady,
     remoteConnected,
     isBusy,
+    isAudioMuted,
+    isVideoMuted,
     startMedia,
     beginPeerSession,
+    toggleAudioMute,
+    toggleVideoMute,
     teardown,
   };
 }
