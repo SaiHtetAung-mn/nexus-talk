@@ -331,7 +331,6 @@ export function useCallSession({
         return;
       }
 
-      toast.message("Call ended");
       teardown();
     }
 

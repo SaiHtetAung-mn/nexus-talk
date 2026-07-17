@@ -76,6 +76,7 @@ export function CallWindowPage() {
 
   const isIncomingRinging =
     call?.status === "ringing" && call.initiatorId !== currentUser?._id;
+  const isCallEnded = call?.status === "ended";
 
   useEffect(() => {
     if (!callId) {
@@ -125,6 +126,19 @@ export function CallWindowPage() {
   }, [call, teardown]);
 
   useEffect(() => {
+    if (!isCallEnded) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      window.close();
+      navigate("/calls", { replace: true });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [isCallEnded, navigate]);
+
+  useEffect(() => {
     const socket = getRealtimeSocket();
 
     function handleCallUpdated(payload: CallSession) {
@@ -149,7 +163,6 @@ export function CallWindowPage() {
             }
           : previous,
       );
-      toast.message("Call ended");
     }
 
     socket.on("call.updated", handleCallUpdated);
@@ -195,7 +208,6 @@ export function CallWindowPage() {
     try {
       const accepted = await acceptVideoCall(call._id);
       setCall(accepted);
-      toast.success("Joined video call");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to accept call.";
@@ -227,7 +239,6 @@ export function CallWindowPage() {
             }
           : previous,
       );
-      toast.success("Call ended");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to end call.";
@@ -238,206 +249,188 @@ export function CallWindowPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="flex items-center justify-between border-b px-5 py-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Nexus Talk Call
-          </p>
-          <h1 className="text-lg font-semibold">
-            {partner?.name ?? "Video call"}
-          </h1>
+    <main className="flex min-h-screen bg-background text-foreground">
+      {isLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <LoaderCircle className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Close window"
-            onClick={() => window.close()}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
+      ) : call ? (
+        <section className="relative flex min-h-screen flex-1 overflow-hidden bg-black">
+          {remoteConnected ? (
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : null}
 
-      <div className="flex flex-1 flex-col bg-muted/30 p-4">
-        {isLoading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <LoaderCircle className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : call ? (
-          <div className="flex flex-1 flex-col gap-4">
-            <div className="grid flex-1 gap-4 lg:grid-cols-[1fr,320px]">
-              <section className="relative overflow-hidden rounded-2xl border bg-card">
-                <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-card-foreground">
-                      {partner?.name ?? "Video call"}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCallLabel(call, remoteConnected)}
-                    </p>
-                  </div>
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/55 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/65 to-transparent" />
+
+          {!remoteConnected ? (
+            <div className="absolute inset-0 flex items-center justify-center px-6">
+              <div className="flex flex-col items-center gap-4 text-center text-white">
+                <ProfileAvatar
+                  name={partner?.name ?? "Video call"}
+                  email={partner?.email ?? null}
+                  className="h-24 w-24 bg-white/10 text-3xl text-white"
+                />
+                <div className="space-y-1">
+                  <p className="text-2xl font-semibold">
+                    {partner?.name ?? "Video call"}
+                  </p>
+                  <p className="text-sm text-white/72">
+                    {isIncomingRinging
+                      ? "Incoming video call"
+                      : call.status === "ringing"
+                        ? "Calling..."
+                        : call.status === "active"
+                          ? "Connecting..."
+                          : "Call ended"}
+                  </p>
                 </div>
+              </div>
+            </div>
+          ) : null}
 
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
-                  {remoteConnected ? (
+          <div className="relative z-10 flex min-h-screen w-full flex-col justify-between p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="rounded-full bg-black/25 px-4 py-2 text-white backdrop-blur">
+                <p className="text-base font-semibold">
+                  {partner?.name ?? "Video call"}
+                </p>
+                <p className="text-xs text-white/72">
+                  {formatCallLabel(call, remoteConnected)}
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="rounded-full bg-black/25 text-white hover:bg-black/40 hover:text-white"
+                aria-label="Close window"
+                onClick={() => window.close()}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/35 shadow-2xl backdrop-blur sm:w-40">
+                <div className="aspect-[3/4] bg-slate-900/80">
+                  {isMediaReady ? (
                     <video
-                      ref={remoteVideoRef}
+                      ref={localVideoRef}
                       autoPlay
+                      muted
                       playsInline
-                      className="h-full w-full object-cover"
+                      className={cn(
+                        "h-full w-full object-cover",
+                        isVideoMuted && "opacity-30",
+                      )}
                     />
                   ) : (
-                    <div className="flex flex-col items-center gap-4 text-center">
-                      <ProfileAvatar
-                        name={partner?.name ?? "Video call"}
-                        email={partner?.email ?? null}
-                        className="h-24 w-24 text-3xl"
-                      />
-                      <div className="space-y-1">
-                        <p className="text-xl font-semibold">
-                          {partner?.name ?? "Video call"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {isIncomingRinging
-                            ? "Incoming call"
-                            : call.status === "ringing"
-                              ? "Calling..."
-                              : call.status === "active"
-                                ? "Waiting for remote video..."
-                                : "Call ended"}
-                        </p>
-                      </div>
+                    <div className="flex h-full items-center justify-center text-white/75">
+                      <Video className="h-5 w-5" />
                     </div>
                   )}
                 </div>
-              </section>
+              </div>
+            </div>
 
-              <aside className="flex flex-col gap-4">
-                <section className="overflow-hidden rounded-2xl border bg-card">
-                  <div className="aspect-[4/5] bg-muted">
-                    {isMediaReady ? (
-                      <video
-                        ref={localVideoRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        className={cn(
-                          "h-full w-full object-cover",
-                          isVideoMuted && "opacity-30",
-                        )}
-                      />
+            <div className="flex flex-col items-center gap-4">
+              {!isMediaReady ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="rounded-full bg-white text-black hover:bg-white/90"
+                  onClick={() => void startMedia()}
+                  disabled={isBusy}
+                >
+                  {isBusy ? (
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Video className="mr-2 h-4 w-4" />
+                  )}
+                  Start camera
+                </Button>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {isIncomingRinging ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="h-14 w-14 rounded-full bg-emerald-600 text-white hover:bg-emerald-500"
+                    onClick={() => void handleAcceptCall()}
+                    disabled={isUpdating}
+                    aria-label="Accept call"
+                  >
+                    {isUpdating ? (
+                      <LoaderCircle className="h-5 w-5 animate-spin" />
                     ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
-                        <Video className="h-5 w-5" />
-                        <p>Start your camera to join the call.</p>
-                      </div>
+                      <PhoneIncoming className="h-5 w-5" />
                     )}
-                  </div>
-                  <div className="border-t px-4 py-3">
-                    <p className="font-medium">{currentUser?.name ?? "You"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {isAudioMuted
-                        ? "Microphone muted"
-                        : isVideoMuted
-                          ? "Camera off"
-                          : isMediaReady
-                            ? "Ready"
-                            : "Media off"}
-                    </p>
-                  </div>
-                </section>
+                  </Button>
+                ) : null}
 
-                <section className="rounded-2xl border bg-card p-4">
-                  <p className="mb-3 font-medium">Controls</p>
-                  <div className="grid gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void startMedia()}
-                      disabled={isBusy}
-                    >
-                      {isBusy ? (
-                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Video className="mr-2 h-4 w-4" />
-                      )}
-                      {isMediaReady ? "Refresh media" : "Start camera"}
-                    </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-14 w-14 rounded-full bg-black/35 text-white hover:bg-black/50 hover:text-white disabled:opacity-50"
+                  onClick={toggleAudioMute}
+                  disabled={!isMediaReady}
+                  aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
+                >
+                  {isAudioMuted ? (
+                    <MicOff className="h-5 w-5" />
+                  ) : (
+                    <Mic className="h-5 w-5" />
+                  )}
+                </Button>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={toggleAudioMute}
-                        disabled={!isMediaReady}
-                      >
-                        {isAudioMuted ? (
-                          <MicOff className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Mic className="mr-2 h-4 w-4" />
-                        )}
-                        {isAudioMuted ? "Unmute" : "Mute"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={toggleVideoMute}
-                        disabled={!isMediaReady}
-                      >
-                        {isVideoMuted ? (
-                          <VideoOff className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Video className="mr-2 h-4 w-4" />
-                        )}
-                        {isVideoMuted ? "Show video" : "Hide video"}
-                      </Button>
-                    </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-14 w-14 rounded-full bg-black/35 text-white hover:bg-black/50 hover:text-white disabled:opacity-50"
+                  onClick={toggleVideoMute}
+                  disabled={!isMediaReady}
+                  aria-label={isVideoMuted ? "Show video" : "Hide video"}
+                >
+                  {isVideoMuted ? (
+                    <VideoOff className="h-5 w-5" />
+                  ) : (
+                    <Video className="h-5 w-5" />
+                  )}
+                </Button>
 
-                    {isIncomingRinging ? (
-                      <Button
-                        type="button"
-                        className="bg-emerald-600 text-white hover:bg-emerald-500"
-                        onClick={() => void handleAcceptCall()}
-                        disabled={isUpdating}
-                      >
-                        {isUpdating ? (
-                          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <PhoneIncoming className="mr-2 h-4 w-4" />
-                        )}
-                        {isUpdating ? "Joining..." : "Accept call"}
-                      </Button>
-                    ) : null}
-
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => void handleEndCall()}
-                      disabled={isUpdating}
-                    >
-                      <PhoneOff className="mr-2 h-4 w-4" />
-                      {call.status === "ended" ? "Close call" : "End call"}
-                    </Button>
-                  </div>
-                </section>
-              </aside>
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-14 w-14 rounded-full bg-rose-600 text-white hover:bg-rose-500"
+                  onClick={() => void handleEndCall()}
+                  disabled={isUpdating}
+                  aria-label="End call"
+                >
+                  <PhoneOff className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <p className="text-lg font-semibold">Call not available</p>
-            <p className="text-sm text-muted-foreground">
-              This call may have ended or the session could not be loaded.
-            </p>
-            <Button type="button" variant="outline" onClick={() => navigate("/")}>
-              Back to workspace
-            </Button>
-          </div>
-        )}
-      </div>
+        </section>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <p className="text-lg font-semibold">Call not available</p>
+          <Button type="button" variant="outline" onClick={() => navigate("/")}>
+            Back to workspace
+          </Button>
+        </div>
+      )}
     </main>
   );
 }

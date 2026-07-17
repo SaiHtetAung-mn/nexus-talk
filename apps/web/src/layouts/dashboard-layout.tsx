@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LoaderCircle,
   PhoneIncoming,
   PhoneOff,
-  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +22,7 @@ import { startRingtone, type RingtoneController } from "@/features/workspace/lib
 import type { CallSession } from "@/features/workspace/api/types";
 
 export function DashboardLayout() {
+  const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const clearUser = useAuthStore((state) => state.clearUser);
@@ -51,9 +51,6 @@ export function DashboardLayout() {
       }
 
       setIncomingCall(call);
-      toast.message(
-        `${call.participants.find((participant) => participant._id !== user?._id)?.name ?? "Someone"} is calling you`,
-      );
     }
 
     function handleCallUpdated(call: CallSession) {
@@ -219,9 +216,6 @@ export function DashboardLayout() {
                   (participant) => participant._id !== user?._id,
                 )?.name ?? "Someone"}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Video call request
-              </p>
               <div className="mt-6 flex w-full items-center gap-3">
                 <Button
                   type="button"
@@ -246,10 +240,6 @@ export function DashboardLayout() {
                   )}
                   Accept
                 </Button>
-              </div>
-              <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
-                <Video className="h-4 w-4" />
-                Opens in a dedicated call window
               </div>
             </div>
           </div>
