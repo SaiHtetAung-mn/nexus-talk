@@ -18,6 +18,7 @@ import type { Server } from 'socket.io';
 import { authCookie } from '@/common/constants/auth-cookie.constant';
 import { AuthService } from '@/features/auth/auth.service';
 import { TokenExpiredException } from '@/features/auth/exceptions/token-expired.exception';
+import { RealtimeAccessService } from './realtime-access.service';
 import { RealtimeService } from './realtime.service';
 import { realtimeRooms } from './realtime.rooms';
 import { WsAuthGuard } from './guards/ws-auth.guard';
@@ -57,6 +58,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   constructor(
     private readonly realtimeService: RealtimeService,
     private readonly authService: AuthService,
+    private readonly realtimeAccessService: RealtimeAccessService,
   ) {}
 
   afterInit(server: Server) {
@@ -110,10 +112,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @MessageBody() payload: JoinConversationPayload,
   ) {
     const conversationId = payload?.conversationId?.trim();
+    const userId = client.data.user?._id ?? '';
     if (!conversationId) {
       throw new BadRequestException('conversationId is required');
     }
 
+    await this.realtimeAccessService.assertConversationMember(
+      conversationId,
+      userId,
+    );
     await client.join(realtimeRooms.conversation(conversationId));
 
     return {
@@ -129,10 +136,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @MessageBody() payload: CallRoomPayload,
   ) {
     const callId = payload?.callId?.trim();
+    const userId = client.data.user?._id ?? '';
     if (!callId) {
       throw new BadRequestException('callId is required');
     }
 
+    await this.realtimeAccessService.assertCallParticipant(callId, userId);
     await client.join(realtimeRooms.call(callId));
 
     return {
@@ -191,7 +200,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    this.emitCallSignal(client, 'call.signal.offer', payload);
+    return this.emitCallSignal(client, 'call.signal.offer', payload);
   }
 
   @UseGuards(WsAuthGuard)
@@ -200,7 +209,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    this.emitCallSignal(client, 'call.signal.answer', payload);
+    return this.emitCallSignal(client, 'call.signal.answer', payload);
   }
 
   @UseGuards(WsAuthGuard)
@@ -209,10 +218,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: CallSignalPayload,
   ) {
-    this.emitCallSignal(client, 'call.signal.ice-candidate', payload);
+    return this.emitCallSignal(client, 'call.signal.ice-candidate', payload);
   }
 
-  private emitCallSignal(
+  private async emitCallSignal(
     client: AuthenticatedSocket,
     event:
       | 'call.signal.offer'
@@ -232,9 +241,19 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
       throw new BadRequestException('targetUserId is required');
     }
 
+    if (!sender?._id) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    await this.realtimeAccessService.assertCallSignalAccess(
+      callId,
+      sender._id,
+      targetUserId,
+    );
+
     this.realtimeService.emitToUser(targetUserId, event as any, {
       callId,
-      fromUserId: sender?._id ?? null,
+      fromUserId: sender._id,
       description: payload.description ?? null,
       candidate: payload.candidate ?? null,
     });

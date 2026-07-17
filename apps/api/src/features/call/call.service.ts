@@ -121,11 +121,19 @@ export class CallService {
 
     call.status = 'ended';
     call.ended_at = new Date();
-    await this.callRepository.save(call);
+    const saved = await this.callRepository.save(call);
+    const response = await this.toResponse(saved);
 
-    this.realtimeService.emitToCall(call._id.toString(), 'call.ended', {
-      callId: call._id.toString(),
+    this.realtimeService.emitToCall(saved._id.toString(), 'call.ended', {
+      callId: saved._id.toString(),
     });
+
+    for (const participantId of saved.participant_ids) {
+      this.realtimeService.emitToUser(participantId, 'call.updated', response);
+      this.realtimeService.emitToUser(participantId, 'call.ended', {
+        callId: saved._id.toString(),
+      });
+    }
 
     return { message: 'Call ended' };
   }

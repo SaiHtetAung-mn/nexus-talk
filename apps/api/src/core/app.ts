@@ -36,7 +36,11 @@ export class App {
       credentials: true,
     });
     this.app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     this.app.useGlobalFilters(
       new UnhandleExceptionFilter(),
