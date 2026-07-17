@@ -21,13 +21,12 @@ export function DashboardLayout() {
     const socket = getRealtimeSocket();
 
     function handleCallInvite(call: CallSession) {
-      const caller = call.participants[0]?.name ?? "Someone";
-      toast.message(`${caller} started a video call`, {
-        action: {
-          label: "Open",
-          onClick: () => navigate(`/calls?call=${encodeURIComponent(call._id)}`),
-        },
-      });
+      const caller =
+        call.participants.find((participant) => participant._id !== user?._id)
+          ?.name ?? "Someone";
+
+      navigate(`/calls?call=${encodeURIComponent(call._id)}`);
+      toast.message(`${caller} is calling you`);
     }
 
     socket.on("call.invite.created", handleCallInvite);
@@ -35,7 +34,7 @@ export function DashboardLayout() {
     return () => {
       socket.off("call.invite.created", handleCallInvite);
     };
-  }, [navigate]);
+  }, [navigate, user?._id]);
 
   async function handleLogout() {
     try {
@@ -55,20 +54,23 @@ export function DashboardLayout() {
   }
 
   const chatId = new URLSearchParams(location.search).get("chat");
+  const callId = new URLSearchParams(location.search).get("call");
   const isChatFullscreen = location.pathname === "/" && Boolean(chatId);
+  const isCallFullscreen = location.pathname === "/calls" && Boolean(callId);
+  const isFullscreenSurface = isChatFullscreen || isCallFullscreen;
 
   return (
     <div className="flex min-h-screen bg-muted/40 text-foreground">
-      <AppRail hideMobileNav={isChatFullscreen} />
+      <AppRail hideMobileNav={isFullscreenSurface} />
 
       <main
         className={
-          isChatFullscreen
+          isFullscreenSurface
             ? "flex min-h-screen flex-1 flex-col pb-0"
             : "flex min-h-screen flex-1 flex-col pb-16 md:pb-0"
         }
       >
-        {isChatFullscreen ? (
+        {isFullscreenSurface ? (
           <div className="hidden md:block">
             <DashboardHeader
               sectionLabel={activeSection?.label}
@@ -86,7 +88,13 @@ export function DashboardLayout() {
           />
         )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-4 sm:py-4">
+        <div
+          className={
+            isCallFullscreen
+              ? "flex-1 overflow-hidden px-0 py-0"
+              : "flex-1 overflow-y-auto px-4 py-4 sm:px-4 sm:py-4"
+          }
+        >
           <Outlet />
         </div>
       </main>
