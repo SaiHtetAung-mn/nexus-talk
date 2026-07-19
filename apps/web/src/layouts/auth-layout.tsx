@@ -5,41 +5,50 @@ import { MessagingCanvas } from "@/features/auth/components/messaging-canvas";
 
 export function AuthLayout() {
   return (
-    <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]">
-      <section className="hidden min-h-screen flex-col justify-center border-r px-10 py-12 lg:flex">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-10">
+    <div className="flex min-h-screen items-center justify-center bg-[whitesmoke] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+      <div className="hidden w-full max-w-6xl overflow-hidden rounded-[2rem] lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(440px,520px)]">
+        <section className="p-8">
+          <div className="flex h-full flex-col gap-8">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background text-foreground">
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Nexus Talk</p>
+                <p className="text-xs text-muted-foreground">Messaging workspace</p>
+              </div>
+            </div>
+
+            <div className="flex flex-1">
+              <div className="w-full overflow-hidden rounded-[1.5rem]">
+                  <div className="aspect-[16/10] w-full">
+                    <MessagingCanvas />
+                  </div>
+                </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border bg-white flex items-center justify-center p-8 xl:p-10">
+          <div className="w-full max-w-md">
+            <Outlet />
+          </div>
+        </section>
+      </div>
+
+      <section className="w-full max-w-md rounded-3xl border bg-card/60 p-6 shadow-sm backdrop-blur sm:p-8 lg:hidden">
+        <div className="mb-8 space-y-2">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background text-foreground">
               <MessageCircle className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-foreground">
-                Nexus Talk
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Messages and calls in one workspace.
-              </p>
+              <p className="text-sm font-semibold text-foreground">Nexus Talk</p>
+              <p className="text-xs text-muted-foreground">Messaging workspace</p>
             </div>
           </div>
-
-          <div className="aspect-[4/3] w-full">
-            <MessagingCanvas />
-          </div>
         </div>
-      </section>
-
-      <section className="flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="w-full max-w-md space-y-8">
-          <div className="space-y-1 text-center lg:hidden">
-            <p className="text-lg font-semibold text-foreground">
-              Nexus Talk
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Messages and calls in one workspace.
-            </p>
-          </div>
-          <Outlet />
-        </div>
+        <Outlet />
       </section>
     </div>
   );

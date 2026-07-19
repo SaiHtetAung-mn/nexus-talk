@@ -4,10 +4,11 @@ import { OAuthButtons } from "../components/oauth-buttons";
 export function RegisterPage() {
   return (
     <div className="space-y-6">
-      <div className="space-y-1 text-center hidden sm:block">
-        <h1 className="text-2xl font-semibold text-foreground">
-          Sign Up
-        </h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold text-foreground">Create account</h1>
+        <p className="text-sm text-muted-foreground">
+          Set up your workspace identity and get connected.
+        </p>
       </div>
       <RegisterForm />
       <div className="space-y-4 pt-4">
